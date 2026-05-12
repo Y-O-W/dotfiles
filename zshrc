@@ -73,3 +73,4 @@ export PYTHONBREAKPOINT=ipdb.set_trace
 
 export GITHUB_USERNAME=`gh api user | jq -r '.login'`
 
+export PATH="$HOME/.local/bin:$PATH"
