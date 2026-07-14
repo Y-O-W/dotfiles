@@ -1,11 +1,3 @@
-This repository is used by [Le Wagon](https://www.lewagon.com) students.
-
-## Toolset
-
-- [oh-my-zsh](http://ohmyz.sh/)
-- [Visual Studio Code](https://code.visualstudio.com/)
-- [git](https://git-scm.com/)
-
 ## Fork status (as of 2026-07-14)
 
 This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still pointing at
