@@ -1,3 +1,6 @@
+
+# Development Environment Recovery System - Chezmoi Dotfiles Manager
+
 ## Fork status (as of 2026-07-14)
 
 This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still pointing at
