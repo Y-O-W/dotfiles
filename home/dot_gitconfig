@@ -52,7 +52,7 @@
 [push]
   default = simple
 
-[branch "master"]
+[branch "main"]
   mergeoptions = --no-edit
 
 [pull]
