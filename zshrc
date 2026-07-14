@@ -70,7 +70,20 @@ export EDITOR=code
 
 # Set ipdb as the default Python debugger
 export PYTHONBREAKPOINT=ipdb.set_trace
-
 export GITHUB_USERNAME=`gh api user | jq -r '.login'`
-
 export PATH="$HOME/.local/bin:$PATH"
+
+# Alias
+alias rsync="git pull && bundle install && yarn install && rails db:migrate && rails restart"
+
+alias render-cv='cd /Users/yowfactor/Developer/personal/Y-O-W.github.io && source .venv/bin/activate && python3 render_cv.py'
+
+# History
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY        # share history across sessions
+setopt HIST_IGNORE_DUPS     # don't record duplicate commands
+
+# Theme
+ZSH_THEME=""
+eval "$(starship init zsh)"

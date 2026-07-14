@@ -12,6 +12,7 @@
 [core]
   pager = less -FRSX
   editor = code --wait
+	excludesFile = /Users/yowfactor/.gitignore_global
 
 [alias]
   co = checkout
@@ -55,10 +56,18 @@
   mergeoptions = --no-edit
 
 [pull]
-  rebase = false
+	rebase = true
 
 [init]
-  defaultBranch = master
+	defaultBranch = main
 [user]
 	email = yves@yowfactor.com
 	name = Y-O-W
+[credential "https://github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://git.heroku.com"]
+	helper = !heroku git:credentials
