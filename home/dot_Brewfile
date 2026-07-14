@@ -1,0 +1,67 @@
+tap "heroku/brew", trusted: true
+tap "supabase/tap"
+# Manage your dotfiles across multiple diverse machines, securely
+brew "chezmoi"
+# Toolkit for image loading and pixel buffer manipulation
+brew "gdk-pixbuf"
+# GitHub command-line tool
+brew "gh"
+# Distributed revision control system
+brew "git"
+# Portable Foreign Function Interface library
+brew "libffi"
+# Cryptography and SSL/TLS Toolkit
+brew "openssl@3"
+# Open-source, cross-platform JavaScript runtime environment
+brew "node"
+# CLI for Heroku
+brew "heroku"
+# Tools and libraries to manipulate images in select formats
+brew "imagemagick"
+# Lightweight and flexible command-line JSON processor
+brew "jq"
+# Postgres C API library
+brew "libpq"
+# YAML Parser
+brew "libyaml"
+# Framework for layout and rendering of i18n text
+brew "pango"
+# Object-relational database system
+brew "postgresql@15", restart_service: :changed
+# Object-relational database system
+brew "postgresql@17", link: true
+# Generic syntax highlighter
+brew "pygments"
+# Ruby version manager
+brew "rbenv"
+# Cross-shell prompt for astronauts
+brew "starship"
+# Internet file retriever
+brew "wget"
+# UNIX shell (command interpreter)
+brew "zsh"
+# Fish shell like syntax highlighting for zsh
+brew "zsh-syntax-highlighting"
+# Supabase CLI
+brew "supabase/tap/supabase", trusted: true
+# Terminal emulator that uses platform-native UI and GPU acceleration
+cask "ghostty"
+# Move and resize windows using keyboard shortcuts or snap areas
+cask "rectangle"
+vscode "alexcvzz.vscode-sqlite"
+vscode "christian-kohler.path-intellisense"
+vscode "ecmel.vscode-html-css"
+vscode "github.codespaces"
+vscode "hediet.vscode-drawio"
+vscode "ms-ossdata.vscode-pgsql"
+vscode "ms-vscode.sublime-keybindings"
+vscode "ms-vsliveshare.vsliveshare"
+vscode "qwtel.sqlite-viewer"
+vscode "rayhanw.erb-helpers"
+vscode "shopify.ruby-lsp"
+vscode "solomonkinard.git-blame"
+vscode "sorbet.sorbet-vscode-extension"
+vscode "vue.volar"
+npm "@fission-ai/openspec"
+npm "@modelcontextprotocol/server-filesystem"
+npm "corepack"

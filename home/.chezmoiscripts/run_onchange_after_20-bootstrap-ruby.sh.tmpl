@@ -1,0 +1,12 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+set -euo pipefail
+
+# .ruby-version hash: {{ include "dot_ruby-version" | sha256sum }}
+eval "$(/opt/homebrew/bin/brew shellenv)"
+eval "$(rbenv init - --no-rehash bash)"
+
+ruby_version="$(cat "$HOME/.ruby-version")"
+rbenv install --skip-existing "$ruby_version"
+rbenv global "$ruby_version"
+{{ end -}}

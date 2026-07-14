@@ -4,7 +4,7 @@ if defined?(Rails)
   short_env_name_options = {
     'development' => 'dev',
     'production'  => 'prod'
-  } 
+  }
   app_name = Rails.application.class.module_parent_name.underscore.dasherize
   env_name = short_env_name_options.fetch(Rails.env) { Rails.env }
   description = 'Prompt has to match the rails app name'
