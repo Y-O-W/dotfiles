@@ -22,9 +22,9 @@ This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still poin
   see the section below. It also contains personal content (e.g. the `render-cv` alias)
   unrelated to the bootcamp template, so it functions as personal dotfiles rather than a
   clean Le Wagon template — which is fine, since that's the intent of this fork.
-- **Recommendation:** keep this fork rather than starting a separate personal dotfiles repo;
-  eventually relocate it under `~/Developer` (currently lives under `~/code`, following the
-  bootcamp's original setup convention).
+- **Recommendation (done 2026-07-14):** keep this fork rather than starting a separate
+  personal dotfiles repo. Relocated from `~/code/Y-O-W/dotfiles` (the bootcamp's original
+  setup convention) to `~/Developer/personal/dotfiles`.
 
 ## Managed with chezmoi
 
@@ -47,8 +47,8 @@ This clones the repo as the chezmoi source directory and writes `.zshrc`, `.gitc
 `.irbrc`, `.rspec`, and `.aliases` into `$HOME`.
 
 By default chezmoi's source directory is `~/.local/share/chezmoi`. On this machine it's
-instead pinned to the existing clone (currently `~/code/Y-O-W/dotfiles`) via `sourceDir`
-in `~/.config/chezmoi/chezmoi.toml` — update that path if the repo is ever moved.
+instead pinned to the existing clone (`~/Developer/personal/dotfiles`) via `sourceDir` in
+`~/.config/chezmoi/chezmoi.toml` — update that path if the repo is ever moved.
 
 ### Making a change
 
