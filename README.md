@@ -109,7 +109,7 @@ brew bundle dump --file="$HOME/.Brewfile" --force   # refresh ~/.Brewfile from w
 chezmoi re-add ~/.Brewfile                            # pull the refresh into the chezmoi source
 chezmoi diff                                          # review before touching anything
 chezmoi apply                                         # usually a no-op here; diff already showed the plan
-cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git push
+cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --rebase && git push
 ```
 
 Bump `home/dot_ruby-version` the same way when you switch Ruby versions — `chezmoi apply` will
