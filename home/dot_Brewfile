@@ -2,6 +2,8 @@ tap "heroku/brew", trusted: true
 tap "supabase/tap"
 # Manage your dotfiles across multiple diverse machines, securely
 brew "chezmoi"
+# TIFF library and utilities
+brew "libtiff"
 # Toolkit for image loading and pixel buffer manipulation
 brew "gdk-pixbuf"
 # GitHub command-line tool
@@ -29,7 +31,7 @@ brew "pango"
 # Object-relational database system
 brew "postgresql@15", restart_service: :changed
 # Object-relational database system
-brew "postgresql@17", link: true
+brew "postgresql@17", restart_service: :changed, link: true
 # Generic syntax highlighter
 brew "pygments"
 # Ruby version manager
