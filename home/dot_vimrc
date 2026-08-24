@@ -1,0 +1,13 @@
+syntax on
+filetype plugin indent on
+
+set number
+set tabstop=4
+set shiftwidth=4
+set noexpandtab       " 42 Norm requires actual tabs, not spaces
+set autoindent
+set smartindent
+set colorcolumn=80    " visual guide for line-length limits
+set showmatch
+set incsearch
+set hlsearch

@@ -55,6 +55,7 @@ for install hooks):
 | `home/dot_irbrc` | `~/.irbrc` | IRB config |
 | `home/dot_pryrc` | `~/.pryrc` | Pry prompt config |
 | `home/dot_rspec` | `~/.rspec` | RSpec config |
+| `home/dot_vimrc` | `~/.vimrc` | Vim config (C-focused: tabs, 4-width indent, 80-col guide for 42 Norm) |
 | `home/dot_Brewfile` | `~/.Brewfile` | Homebrew formulae/casks/taps snapshot |
 | `home/dot_ruby-version` | `~/.ruby-version` | pinned default Ruby version for rbenv |
 | `home/private_dot_ssh/private_config` | `~/.ssh/config` | SSH config (0700/0600) |
@@ -84,8 +85,8 @@ they aren't machine config.
    ```
    This one command now does more than write dotfiles — it also:
    - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.gitignore_global`, `.irbrc`, `.pryrc`,
-     `.rspec`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and `~/.claude/settings.json`
-     into place,
+     `.rspec`, `.vimrc`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and
+     `~/.claude/settings.json` into place,
    - installs oh-my-zsh plus its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins
      (only on first run, if `~/.oh-my-zsh` doesn't already exist),
    - installs every Homebrew formula/cask/tap/vscode-extension/npm-global-package in
