@@ -4,5 +4,7 @@
     "ruby-lsp@claude-plugins-official": true
   },
   "tui": "fullscreen",
-  "theme": "auto"
+  "theme": "auto",
+  "agentPushNotifEnabled": true,
+  "inputNeededNotifEnabled": true
 }

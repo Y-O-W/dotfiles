@@ -27,6 +27,17 @@ This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still poin
   `settings.json`/`keybindings.json` files have been retired — everything they used to handle
   now lives under `home/` and is actually applied by `chezmoi apply`, rather than sitting
   around as unapplied reference copies.
+- **Verified (2026-08-24):** still 0 commits behind `upstream/master` (last upstream commit
+  unchanged, 2025-12-02). `chezmoi diff` turned up real drift: `~/.zshrc` and
+  `~/.claude/settings.json` had been edited directly on this machine (PATH dedup, a
+  per-project `bin`/`node_modules/.bin` PATH hook, an async-cached `$GITHUB_USERNAME` lookup,
+  `zsh-autosuggestions` enabled, plus two extra Claude settings keys) without those changes
+  ever being pulled back into the chezmoi source — a real gap for a "recovery" repo, since
+  restoring from it would have silently reverted those improvements. Pulled in with
+  `chezmoi re-add` and applied. Also fixed a stale README claim (`postgresql@17` no longer
+  needs manual starting — the Brewfile now flags it `restart_service: :changed` same as
+  `postgresql@15`) and documented the previously-unlisted oh-my-zsh bootstrap script
+  (`run_once_after_00-install-oh-my-zsh.sh.tmpl`) and `dot_gitignore_global`.
 
 ## Managed with chezmoi
 
@@ -49,6 +60,8 @@ for install hooks):
 | `home/private_dot_ssh/private_config` | `~/.ssh/config` | SSH config (0700/0600) |
 | `home/private_dot_claude/settings.json` | `~/.claude/settings.json` | Claude Code settings (0700 dir) |
 | `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
+| `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
+| `home/.chezmoiscripts/run_once_after_00-install-oh-my-zsh.sh.tmpl` | — | installs oh-my-zsh and its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins the first time chezmoi runs on a machine |
 | `home/.chezmoiscripts/run_onchange_after_10-install-packages-darwin.sh.tmpl` | — | runs `brew bundle` whenever `dot_Brewfile` changes |
 | `home/.chezmoiscripts/run_onchange_after_20-bootstrap-ruby.sh.tmpl` | — | installs/sets the pinned Ruby via rbenv whenever `dot_ruby-version` changes |
 
@@ -69,12 +82,15 @@ they aren't machine config.
    chezmoi init --apply --ssh Y-O-W/dotfiles
    ```
    This one command now does more than write dotfiles — it also:
-   - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.irbrc`, `.pryrc`, `.rspec`, `.aliases`,
-     `~/.ssh/config`, VS Code `settings.json`, and `~/.claude/settings.json` into place,
-   - installs every Homebrew formula/cask/tap in `~/.Brewfile` (including `postgresql@15` and
-     `postgresql@17` — `postgresql@15` is flagged `restart_service: :changed` in the Brewfile,
-     so Homebrew starts it automatically on a fresh install; `postgresql@17` installs but stays
-     stopped),
+   - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.gitignore_global`, `.irbrc`, `.pryrc`,
+     `.rspec`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and `~/.claude/settings.json`
+     into place,
+   - installs oh-my-zsh plus its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins
+     (only on first run, if `~/.oh-my-zsh` doesn't already exist),
+   - installs every Homebrew formula/cask/tap/vscode-extension/npm-global-package in
+     `~/.Brewfile` (including `postgresql@15` and `postgresql@17`, both flagged
+     `restart_service: :changed`, so Homebrew starts both automatically on a fresh install since
+     both count as newly installed),
    - installs rbenv's pinned Ruby version (`~/.ruby-version`) and sets it as the rbenv global.
 
 By default chezmoi's source directory is `~/.local/share/chezmoi`. On this machine it's
@@ -86,9 +102,6 @@ instead pinned to the existing clone (`~/Developer/personal/dotfiles`) via `sour
 A few things intentionally aren't automated, either because they need a human judgment call
 or can't be scripted at all:
 
-- **Start `postgresql@17`, if you need it:** `brew services start postgresql@17` (only
-  `postgresql@15` auto-starts, since that's the one actually captured as "changed" in the
-  Brewfile — see above).
 - **Load your SSH key into the keychain:** `ssh-add --apple-use-keychain ~/.ssh/id_ed25519`.
   The private key itself is never chezmoi-managed (it's not in this repo) — it needs to
   already exist or be restored from wherever it's backed up first.
@@ -114,6 +127,12 @@ cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --r
 
 Bump `home/dot_ruby-version` the same way when you switch Ruby versions — `chezmoi apply` will
 install and switch to it automatically on every machine next time you `chezmoi update`.
+
+The same applies to any other managed file: if you ever edit a target directly (e.g. tweak
+`~/.zshrc` or `~/.claude/settings.json` instead of going through `chezmoi edit`), run
+`chezmoi re-add` for that file before you forget — otherwise the live improvement never makes
+it into the source and a future restore silently reverts it. `chezmoi status` shows any target
+that's drifted from source.
 
 If this loop starts to feel tedious, wrapping it in a single shell alias is a reasonable next
 step — not worth pre-building until it actually is.
