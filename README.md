@@ -128,6 +128,28 @@ cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --r
 Bump `home/dot_ruby-version` the same way when you switch Ruby versions — `chezmoi apply` will
 install and switch to it automatically on every machine next time you `chezmoi update`.
 
+### Keeping Ruby/Homebrew/PostgreSQL current
+
+`bin/update-dev-versions.sh` automates the safe part of this: it bumps the Ruby pin to the
+latest patch within the currently pinned minor line, runs `brew bundle install --upgrade` so
+every Brewfile-tracked formula/cask (including `postgresql@15`/`postgresql@17`) is on its
+latest point release, refreshes the Brewfile snapshot, applies the change locally, and commits
+— but it never pushes, so you can review with `git show` first. Run it with:
+
+```sh
+bin/update-dev-versions.sh
+```
+
+It deliberately does **not** auto-apply three things, since each needs a human call:
+- **Ruby minor/major bumps** (e.g. 3.3.x → 3.4.x or 4.0.x) — new lines can break native
+  extensions in existing gems, so the script only reports that a newer line exists.
+- **PostgreSQL major-version bumps** (e.g. `postgresql@17` → `postgresql@18`) — this needs
+  `pg_upgrade` or a dump/restore of your actual databases, not just a formula swap. The script
+  reports when a newer major is available; bump the Brewfile yourself once you've migrated data.
+- **Rails** — it's a per-project gem pinned in each app's `Gemfile.lock`, not something dotfiles
+  can own globally. The script just flags if the global `rails` gem is outdated; bump each
+  project with `bundle update rails --conservative`.
+
 The same applies to any other managed file: if you ever edit a target directly (e.g. tweak
 `~/.zshrc` or `~/.claude/settings.json` instead of going through `chezmoi edit`), run
 `chezmoi re-add` for that file before you forget — otherwise the live improvement never makes
