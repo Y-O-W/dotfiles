@@ -4,4 +4,12 @@ set -euo pipefail
 
 # .Brewfile hash: {{ include "dot_Brewfile" | sha256sum }}
 brew bundle --file="$HOME/.Brewfile"
+
+# Give postgresql@17 its own port (5433) so it can run alongside postgresql@15
+# (default 5432, used by existing app databases) instead of failing to bind.
+pg17_conf="$(brew --prefix)/var/postgresql@17/postgresql.conf"
+if [ -f "$pg17_conf" ] && ! grep -q "^port = 5433" "$pg17_conf"; then
+  sed -i '' 's/^#port = 5432.*/port = 5433\t\t\t\t# (change requires restart)/' "$pg17_conf"
+  brew services restart postgresql@17
+fi
 {{ end -}}

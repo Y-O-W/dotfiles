@@ -7,3 +7,7 @@ alias serve='ruby -run -e httpd . -p 8000' # Or python -m SimpleHTTPServer :)
 
 # NOTE: On Q3 2021, Le Wagon decided to change the Web Dev curriculum default text editor
 alias stt="echo 'Launching VS Code instead of Sublime Text... (cf ~/.aliases)' && code ."
+
+# Scaffold a new Rails app on this machine's current defaults (Ruby 4.0.x, PostgreSQL 17)
+# using the personal app template in ~/.rails-templates/rails_new.rb
+alias rails-new='rails new -d postgresql -m ~/.rails-templates/rails_new.rb'

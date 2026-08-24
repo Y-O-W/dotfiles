@@ -61,6 +61,7 @@ for install hooks):
 | `home/private_dot_claude/settings.json` | `~/.claude/settings.json` | Claude Code settings (0700 dir) |
 | `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
 | `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
+| `home/dot_rails-templates/rails_new.rb` | `~/.rails-templates/rails_new.rb` | personal Rails app template (Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) used by the `rails-new` alias |
 | `home/.chezmoiscripts/run_once_after_00-install-oh-my-zsh.sh.tmpl` | — | installs oh-my-zsh and its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins the first time chezmoi runs on a machine |
 | `home/.chezmoiscripts/run_onchange_after_10-install-packages-darwin.sh.tmpl` | — | runs `brew bundle` whenever `dot_Brewfile` changes |
 | `home/.chezmoiscripts/run_onchange_after_20-bootstrap-ruby.sh.tmpl` | — | installs/sets the pinned Ruby via rbenv whenever `dot_ruby-version` changes |
@@ -91,6 +92,8 @@ they aren't machine config.
      `~/.Brewfile` (including `postgresql@15` and `postgresql@17`, both flagged
      `restart_service: :changed`, so Homebrew starts both automatically on a fresh install since
      both count as newly installed),
+   - moves `postgresql@17` to port 5433 (see "New apps default to Ruby 4.0 / PostgreSQL 17"
+     below) so it doesn't fail to bind against `postgresql@15` on the default 5432,
    - installs rbenv's pinned Ruby version (`~/.ruby-version`) and sets it as the rbenv global.
 
 By default chezmoi's source directory is `~/.local/share/chezmoi`. On this machine it's
@@ -158,6 +161,36 @@ that's drifted from source.
 
 If this loop starts to feel tedious, wrapping it in a single shell alias is a reasonable next
 step — not worth pre-building until it actually is.
+
+### New apps default to Ruby 4.0 / PostgreSQL 17
+
+The global rbenv pin (`home/dot_ruby-version`) is `4.0.6`. Any project directory that doesn't
+have its own `.ruby-version` picks this up automatically, and `rails new` bakes whatever Ruby
+is currently active into the new app's own `.ruby-version` — so this alone is enough for new
+apps to start on Ruby 4.0. **Existing** apps are unaffected, since each already has its own
+`.ruby-version` (mostly still `3.3.5`) which always takes precedence over the global default.
+
+PostgreSQL needed more than a version bump: `postgresql@17` and `postgresql@15` both default
+to port 5432, and `postgresql@15` is already running there serving several existing apps'
+databases. Making `postgresql@17` the default on 5432 would have broken those apps, so instead
+`postgresql@17` is moved to **port 5433** — both instances now run side by side, `@15` staying
+untouched on 5432 for existing apps. This is done automatically by
+`run_onchange_after_10-install-packages-darwin.sh.tmpl` (idempotent — safe to re-run) whenever
+the Brewfile changes, so a fresh machine ends up in the same state.
+
+Since a plain `rails new -d postgresql` generates a `config/database.yml` with no port set
+(defaulting to 5432 → `postgresql@15`), a new app needs to explicitly target 5433 to actually
+land on PostgreSQL 17. `home/dot_rails-templates/rails_new.rb` is a personal Rails app template
+(Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) that does this — its first step
+injects `port: 5433` into `config/database.yml` before `after_bundle` runs `db:create`. Scaffold
+a new app with:
+
+```sh
+rails-new my_app_name
+```
+
+(the `rails-new` alias in `home/dot_aliases`, expands to
+`rails new -d postgresql -m ~/.rails-templates/rails_new.rb`).
 
 ### Making a change
 
