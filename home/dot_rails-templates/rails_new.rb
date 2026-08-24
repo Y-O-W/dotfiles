@@ -77,7 +77,7 @@ file "CLAUDE.md", <<~MARKDOWN
 
   This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-  Stack: Ruby 4.0.6, Rails 8.1.1, PostgreSQL 17, Tailwind, Propshaft
+  Stack: Ruby #{RUBY_VERSION}, Rails #{Rails::VERSION::STRING}, PostgreSQL 17 (localhost:5433), Tailwind, Propshaft
   <!-- This needs to be changed to reflect project setups -->
 
   ### Rails conventions and "magic"
@@ -101,19 +101,44 @@ file "CLAUDE.md", <<~MARKDOWN
 
   When making a refactor, always explain what is changing and why it is beneficial before making the change.
 
+  ### Spec-driven changes
+
+  Non-trivial changes go through OpenSpec: `/opsx:propose "..."` to draft a change proposal,
+  `/opsx:apply` to implement an approved one. See `openspec/` for current specs and in-flight
+  changes.
+
   ## JavaScript
 
-  All JavaScript must be written as Stimulus controllers. No inline scripts or bare `addEventListener` calls.
+  Two patterns are available, both loaded via import maps — no bundler, no build step:
+  - **Stimulus controllers** — behavior wired to server-rendered/Turbo-updated DOM (forms,
+    `data-*` attributes, reacting to Turbo events). Default for anything tied to a specific view.
+  - **Web Components (native Custom Elements)** — self-contained widgets that own their state
+    and rendering, independent of the surrounding page. Reach for this when a piece of UI
+    doesn't need Rails-rendered data attributes to function.
+
+  No inline scripts or bare `addEventListener` calls outside a controller or component. See
+  `app/javascript/CLAUDE.md` for conventions and examples of each.
 MARKDOWN
 
 # app/javascript/CLAUDE.md
 ########################################
 file "app/javascript/CLAUDE.md", <<~MARKDOWN
-  # JavaScript — Stimulus conventions
+  # JavaScript — Stimulus & Web Component conventions
 
-  All JS in this project is written as Stimulus controllers. No inline scripts, no bare `addEventListener` calls outside a controller.
+  Two patterns are available, both loaded via import maps — no bundler, no build step. Pick one
+  per widget, don't mix within it:
 
-  ## Creating a controller
+  - **Stimulus controllers** — behavior wired to server-rendered or Turbo-updated DOM: forms,
+    `data-*` attributes, reacting to Turbo events, manipulating elements Rails rendered. Default
+    for anything tied to a specific view/controller.
+  - **Web Components (native Custom Elements)** — self-contained, reusable widgets that own
+    their state and rendering, independent of the surrounding page. Reach for this when a piece
+    of UI doesn't need Rails-rendered data attributes to function (e.g. a countdown timer, a
+    copy-to-clipboard button, a client-side-only chart).
+
+  No inline scripts, no bare `addEventListener` calls outside a controller or component.
+
+  ## Stimulus controllers
 
   1. Add `app/javascript/controllers/<name>_controller.js` — auto-loaded by `controllers/index.js`.
   2. Wire it up in HTML with `data-controller="<name>"`.
@@ -130,8 +155,6 @@ file "app/javascript/CLAUDE.md", <<~MARKDOWN
   }
   ```
 
-  ## HTML attributes
-
   | Purpose | Attribute |
   |---|---|
   | Mount controller | `data-controller="name"` |
@@ -141,21 +164,39 @@ file "app/javascript/CLAUDE.md", <<~MARKDOWN
 
   Default event per element (`input`→`input`, `form`→`submit`, `a/button`→`click`) can be omitted: `data-action="name#method"`.
 
+  ## Web Components
+
+  Not scaffolded by default — this is the convention to follow the first time one is needed.
+
+  1. Add `app/javascript/elements/<name>_element.js`, defining and registering the element:
+
+     ```js
+     class CopyButtonElement extends HTMLElement {
+       connectedCallback() {
+         this.addEventListener("click", () => navigator.clipboard.writeText(this.dataset.text))
+       }
+     }
+
+     customElements.define("copy-button", CopyButtonElement)
+     ```
+
+  2. Pin the directory in `config/importmap.rb`, alongside the existing `controllers` pin:
+     ```ruby
+     pin_all_from "app/javascript/elements", under: "elements"
+     ```
+  3. Import it once, as a side effect, from `app/javascript/application.js`:
+     ```js
+     import "elements/copy_button_element"
+     ```
+  4. Use it directly in views, no `data-controller` needed: `<copy-button data-text="...">Copy</copy-button>`.
+
   ## Adding an external library
 
   1. Pin it in `config/importmap.rb`:
      ```ruby
      pin "library-name", to: "https://cdn.example.com/library.esm.js"
      ```
-  2. Import it inside the controller that needs it — not globally:
-     ```js
-     import LibraryName from "library-name"
-     ```
-
-  ## Existing controllers
-
-  - `star_rating_controller.js` — mounts `star-rating.js` on a `<select>` for the review rating field.
-  - `tom_select_controller.js` — mounts `TomSelect` on the movie `<select>` in the bookmark form for searchable dropdown behaviour.
+  2. Import it inside the controller or component that needs it — not globally.
 MARKDOWN
 
 # app/views/CLAUDE.md
@@ -311,6 +352,10 @@ after_bundle do
   # CI
   ########################################
   remove_file ".github/workflows/ci.yml"
+
+  # OpenSpec (spec-driven change workflow for Claude Code)
+  ########################################
+  run "openspec init --tools claude --force"
 
   # Git
   ########################################

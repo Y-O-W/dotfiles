@@ -9,4 +9,10 @@ eval "$(rbenv init - --no-rehash bash)"
 ruby_version="$(cat "$HOME/.ruby-version")"
 rbenv install --skip-existing "$ruby_version"
 rbenv global "$ruby_version"
+rbenv rehash
+
+# The global gem set is per-Ruby-version and starts empty on a fresh install.
+# `rails new` (via the `rails-new` alias/template) needs the rails gem itself
+# present under whichever Ruby is the global default.
+gem list -i '^rails$' >/dev/null 2>&1 || gem install rails --no-document
 {{ end -}}
