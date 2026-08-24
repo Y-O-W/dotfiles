@@ -20,6 +20,19 @@
     },
     "editor.tabSize": 2,
     "editor.detectIndentation": false,
+    "[makefile]": {
+        "editor.insertSpaces": false
+    },
+    "[c]": {
+        "editor.insertSpaces": false,
+        "editor.tabSize": 4
+    },
+    "[ruby]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.defaultFormatter": "Shopify.ruby-lsp",
+        "editor.formatOnSave": true
+    },
     "terminal.external.osxExec": "Warp.app",
     "pgsql.serverGroups": [
       {
