@@ -193,6 +193,30 @@ rails-new my_app_name
 (the `rails-new` alias in `home/dot_aliases`, expands to
 `rails new -d postgresql -m ~/.rails-templates/rails_new.rb`).
 
+### Local dev server ports
+
+No framework coordinates its default port with any other, so running two dev servers at once
+can collide — Rails (Puma) and Next.js both default to **3000**. This table is a personal
+reference for what each stack actually uses, so a clash gets caught by reading this instead of
+by a "port already in use" error:
+
+| Framework/tool | Port | Notes |
+|---|---|---|
+| Rails (Puma) | 3000 | framework default, unchanged |
+| Next.js | 3001 | overridden — framework default is 3000, same as Rails |
+| Vite | 5173 | framework default, unchanged |
+| Django | 8000 | framework default, unchanged |
+| Flask | 5000 | framework default; macOS AirPlay Receiver often already holds 5000, falls back to 5001 |
+| Vue CLI / Webpack dev server | 8080 | framework default, unchanged |
+| Angular CLI | 4200 | framework default, unchanged |
+| PostgreSQL | 5432 (`@15`), 5433 (`@17`) | see "New apps default to Ruby 4.0 / PostgreSQL 17" above |
+| Redis | 6379 | framework default, unchanged |
+
+To apply an overridden port to a project, set it explicitly rather than relying on the
+framework default — e.g. for Next.js, `"dev": "next dev -p 3001"` in `package.json`, or
+`PORT=3001` in `.env.local`. This table records intent; it isn't chezmoi-managed, since the
+actual port is set per-project, not machine-wide.
+
 ### Making a change
 
 - `chezmoi edit ~/.zshrc` opens the source file in `$EDITOR`, then run `chezmoi apply` to
