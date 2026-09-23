@@ -98,12 +98,23 @@ When that's the case:
   authoritative. A skill folder copied straight into `~/.claude/skills/<name>/`
   is local drift until it's pulled back into that source tree; don't report
   the skill as done until it has been.
-- Look for a sync helper in the repo (commonly something like
-  `bin/sync-dotfiles.sh`) that runs the tool's own "pull drift into source"
-  command (`chezmoi re-add` for chezmoi). Run it, or add the single new
-  skill directly (`chezmoi add ~/.claude/skills/<skill-name>`). Either way,
-  show the user the resulting diff before committing — don't commit
-  automatically as part of finishing a skill.
+- Sync direction depends on which copy you actually edited:
+  - If you wrote or copied the skill straight into the live path
+    (`~/.claude/skills/<skill-name>/`), pull it into the dotfiles source.
+    Look for a sync helper in the repo (commonly something like
+    `bin/sync-dotfiles.sh`) that runs the tool's own "pull drift into
+    source" command (`chezmoi re-add` for chezmoi), or add just the new
+    skill directly (`chezmoi add ~/.claude/skills/<skill-name>`).
+  - If you edited the dotfiles source tree directly instead (e.g. you were
+    already working inside the dotfiles repo), push that out to the live
+    path with a **scoped** apply: `chezmoi apply -- ~/.claude/skills/<skill-name>`.
+    Scoping to the one skill's target path is safe to run without asking —
+    it's narrow and trivially revertible via git. Never run a bare
+    `chezmoi apply` as part of this: with no path argument it applies
+    *every* pending change across the whole dotfiles-managed home
+    directory, including unrelated drift the user hasn't reviewed yet.
+  - Either direction, show the user the resulting diff before committing —
+    don't commit automatically as part of finishing a skill.
 - Never stage Claude Code's own self-regenerating skill cache (commonly a
   directory named `synced` under `~/.claude/skills/`) into the dotfiles
   repo — it's runtime state Code recreates itself, not authored content.
