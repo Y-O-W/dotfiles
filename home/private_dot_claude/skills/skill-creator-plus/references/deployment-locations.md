@@ -82,3 +82,31 @@ session, mirror it to the other location too:
 Tell the user which locations you mirrored to. A fresh Claude Code session
 (or reopening Desktop) may be needed before the mirrored copy actually
 shows up in that surface's available-skills listing.
+
+## If `~/.claude/skills` is dotfiles-managed
+
+Some setups track `~/.claude/skills` through a dotfiles tool (chezmoi is
+the common case) instead of treating it as the real source of truth.
+Signs to check for before assuming a plain copy is the last step: a
+`.chezmoiroot`/chezmoi source tree, or a sibling dotfiles repo with a
+`skills/` directory under a path like `private_dot_claude/skills`; ask the
+user if it's genuinely ambiguous.
+
+When that's the case:
+
+- The dotfiles repo's source tree — not `~/.claude/skills` directly — is
+  authoritative. A skill folder copied straight into `~/.claude/skills/<name>/`
+  is local drift until it's pulled back into that source tree; don't report
+  the skill as done until it has been.
+- Look for a sync helper in the repo (commonly something like
+  `bin/sync-dotfiles.sh`) that runs the tool's own "pull drift into source"
+  command (`chezmoi re-add` for chezmoi). Run it, or add the single new
+  skill directly (`chezmoi add ~/.claude/skills/<skill-name>`). Either way,
+  show the user the resulting diff before committing — don't commit
+  automatically as part of finishing a skill.
+- Never stage Claude Code's own self-regenerating skill cache (commonly a
+  directory named `synced` under `~/.claude/skills/`) into the dotfiles
+  repo — it's runtime state Code recreates itself, not authored content.
+  If the repo's sync tooling already excludes it, leave that exclusion
+  alone; if you don't see one, flag the risk to the user rather than
+  silently adding it.

@@ -421,6 +421,8 @@ Take `best_description` from the JSON output and update the skill's SKILL.md fro
 
 When you're editing files directly on this machine (not exporting a `.skill` package for someone else to install), a finished skill should end up visible everywhere the user actually works, not just wherever this conversation happens to be running. Claude Code and Claude Desktop's agent/Cowork mode discover skills from two separate, non-overlapping locations — see `references/deployment-locations.md` for both paths and the mirroring procedure.
 
+Before treating a locally-copied skill as installed, check whether `~/.claude/skills` is itself managed by a dotfiles tool (chezmoi, etc.) rather than being the real source of truth — see `references/deployment-locations.md`'s dotfiles-sync section. If it is, copying a skill folder into it is not the last step.
+
 One landmine worth knowing before you consider any skill finished, regardless of environment: keep the frontmatter `description` as a single continuous line. Claude Code's discovery appears to silently drop a skill whose description is written as a multi-line YAML block scalar (`description: >` with indented continuation lines), with no error surfaced anywhere — this has been directly observed, not just suspected. If a draft ever ends up with a multi-line description, fold it back to one line before treating the skill as done.
 
 ---
