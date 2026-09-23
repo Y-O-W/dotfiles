@@ -4,7 +4,7 @@ ZSH=$HOME/.oh-my-zsh
 typeset -U path
 
 # Useful oh-my-zsh plugins for Le Wagon bootcamps
-plugins=(git gitfast last-working-dir common-aliases history-substring-search zsh-autosuggestions zsh-syntax-highlighting)
+plugins=(git gitfast last-working-dir common-aliases history-substring-search zsh-syntax-highlighting)
 
 # (macOS-only) Prevent Homebrew from reporting - https://github.com/Homebrew/brew/blob/master/docs/Analytics.md
 export HOMEBREW_NO_ANALYTICS=1

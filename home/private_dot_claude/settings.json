@@ -1,10 +1,28 @@
 {
   "model": "sonnet",
+  "permissions": {
+    "defaultMode": "default"
+  },
   "enabledPlugins": {
-    "ruby-lsp@claude-plugins-official": true
+    "ruby-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true
   },
   "tui": "fullscreen",
   "theme": "auto",
+  "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "inputNeededNotifEnabled": true
+  "outputStyle": "Learning",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/yowfactor/.claude/hooks/skill-usage-tracker.py"
+          }
+        ]
+      }
+    ]
+  }
 }

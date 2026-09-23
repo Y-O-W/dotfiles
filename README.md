@@ -38,6 +38,16 @@ This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still poin
   needs manual starting — the Brewfile now flags it `restart_service: :changed` same as
   `postgresql@15`) and documented the previously-unlisted oh-my-zsh bootstrap script
   (`run_once_after_00-install-oh-my-zsh.sh.tmpl`) and `dot_gitignore_global`.
+- **Extended (2026-09-23):** audited `~/.claude/` end-to-end (issue #14) — only `settings.json`
+  was tracked; a custom hook (`hooks/skill-usage-tracker.py`) and three hand-modified skills
+  (`change-to-github-epic`, `skill-creator`, `skill-creator-plus`) existed only on this machine
+  and were now added. `~/.claude/skills/synced/` deliberately stayed untracked — see the note
+  under "Managed with chezmoi" below. Adding it also surfaced real `settings.json` drift (a
+  `hooks` block missing from source that `chezmoi apply` would have silently deleted) and two
+  chezmoi naming gotchas: a bare `run_` prefix anywhere in the source tree is parsed as a script
+  to execute, not a literal filename (worked around with the `literal_` prefix), and zero-byte
+  files are dropped from the target state unless prefixed `empty_`. Built `bin/sync-dotfiles.sh`
+  (issue #20) to make re-catching this kind of drift routine — see "Keeping this in sync" below.
 
 ## Managed with chezmoi
 
@@ -60,6 +70,10 @@ for install hooks):
 | `home/dot_ruby-version` | `~/.ruby-version` | pinned default Ruby version for rbenv |
 | `home/private_dot_ssh/private_config` | `~/.ssh/config` | SSH config (0700/0600) |
 | `home/private_dot_claude/settings.json` | `~/.claude/settings.json` | Claude Code settings (0700 dir) |
+| `home/private_dot_claude/hooks/executable_skill-usage-tracker.py` | `~/.claude/hooks/skill-usage-tracker.py` | custom PostToolUse hook (skill usage logging), referenced by absolute path from `settings.json`'s `hooks` config |
+| `home/private_dot_claude/skills/change-to-github-epic/` | `~/.claude/skills/change-to-github-epic/` | custom Claude Code skill (OpenSpec change → GitHub epic) |
+| `home/private_dot_claude/skills/skill-creator/` | `~/.claude/skills/skill-creator/` | locally modified copy of Anthropic's skill-creator skill |
+| `home/private_dot_claude/skills/skill-creator-plus/` | `~/.claude/skills/skill-creator-plus/` | locally modified skill-creator variant with an added landscape-scan step |
 | `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
 | `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
 | `home/dot_rails-templates/rails_new.rb` | `~/.rails-templates/rails_new.rb` | personal Rails app template (Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) used by the `rails-new` alias |
@@ -69,6 +83,12 @@ for install hooks):
 
 `README.md` and `LICENSE` at the repo root are outside `home/` and untouched by chezmoi, as
 they aren't machine config.
+
+**Not tracked, deliberately:** `~/.claude/skills/synced/` and `~/.claude/plugins/synced/` are
+Claude Code's own auto-refresh cache of skills sourced from Anthropic or an installed plugin —
+never hand-edited, and rebuilt automatically the moment Claude Code runs on a new machine. So is
+everything else under `~/.claude/` not listed in the table above (`projects/`, `cache/`,
+`telemetry/`, `history.jsonl`, etc.) — machine-local runtime state and logs, not config.
 
 ### First-time setup on a new machine
 
@@ -86,7 +106,8 @@ they aren't machine config.
    This one command now does more than write dotfiles — it also:
    - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.gitignore_global`, `.irbrc`, `.pryrc`,
      `.rspec`, `.vimrc`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and
-     `~/.claude/settings.json` into place,
+     `~/.claude/settings.json`, `~/.claude/hooks/`, and `~/.claude/skills/` (custom skills only —
+     see below) into place,
    - installs oh-my-zsh plus its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins
      (only on first run, if `~/.oh-my-zsh` doesn't already exist),
    - installs every Homebrew formula/cask/tap/vscode-extension/npm-global-package in
@@ -118,14 +139,31 @@ or can't be scripted at all:
 
 ### Keeping this in sync
 
-Since the dev environment keeps changing, refresh the snapshot whenever you install/remove a
-brew package, gem, or change your rbenv global:
+Run this before starting any work on the repo, not just when you remember to:
+
+```sh
+bin/sync-dotfiles.sh
+```
+
+Local edits (tweaking `~/.zshrc` or `~/.claude/settings.json` directly instead of going through
+`chezmoi edit`) happen constantly, and if they never make it back into the source, a future
+restore silently reverts them — issue #14 nearly lost a `hooks` config to exactly this. The
+script runs `chezmoi diff`, pulls any drift it finds into the source with `chezmoi re-add`, and
+reports genuinely new, unmanaged files under `~/.claude/skills/` and `~/.claude/hooks/` that
+might be worth tracking (see issue #20). It never commits — drift can be a real improvement or
+something you don't actually want in the repo, and only you can tell the difference — so review
+with `git diff` before committing yourself.
+
+For anything outside those paths, `chezmoi status` shows which managed targets have drifted, and
+`chezmoi unmanaged <path>...` lists untracked files under a given directory (never run it with no
+path — it scans the whole home directory).
+
+Refresh the Homebrew snapshot whenever you install/remove a brew package, then let the sync
+script pick up the resulting drift:
 
 ```sh
 brew bundle dump --file="$HOME/.Brewfile" --force   # refresh ~/.Brewfile from what's installed
-chezmoi re-add ~/.Brewfile                            # pull the refresh into the chezmoi source
-chezmoi diff                                          # review before touching anything
-chezmoi apply                                         # usually a no-op here; diff already showed the plan
+bin/sync-dotfiles.sh                                  # pulls the refresh into the chezmoi source
 cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --rebase && git push
 ```
 
@@ -154,14 +192,8 @@ It deliberately does **not** auto-apply three things, since each needs a human c
   can own globally. The script just flags if the global `rails` gem is outdated; bump each
   project with `bundle update rails --conservative`.
 
-The same applies to any other managed file: if you ever edit a target directly (e.g. tweak
-`~/.zshrc` or `~/.claude/settings.json` instead of going through `chezmoi edit`), run
-`chezmoi re-add` for that file before you forget — otherwise the live improvement never makes
-it into the source and a future restore silently reverts it. `chezmoi status` shows any target
-that's drifted from source.
-
-If this loop starts to feel tedious, wrapping it in a single shell alias is a reasonable next
-step — not worth pre-building until it actually is.
+The same drift risk applies to any managed file, not just the Brewfile — see
+"Keeping this in sync" above for `bin/sync-dotfiles.sh`, which catches this generally.
 
 ### New apps default to Ruby 4.0 / PostgreSQL 17
 
@@ -232,4 +264,7 @@ actual port is set per-project, not machine-wide.
 | `chezmoi apply` | Write the source state to the target files in `$HOME` |
 | `chezmoi update` | `git pull` the source repo and apply, in one step |
 | `chezmoi status` | Show which managed files differ from source |
+| `chezmoi re-add` | Pull local drift (edits made directly on a target) back into the source |
+| `chezmoi unmanaged <path>...` | List untracked files under the given path(s) |
 | `chezmoi source-path` | Print where the source directory lives locally |
+| `bin/sync-dotfiles.sh` | Pull all drift into source + report new unmanaged skill/hook files |
