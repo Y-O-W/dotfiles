@@ -86,16 +86,25 @@ Settings → Capabilities → Skills → Add skill → Upload skill). Requiremen
 - folder name equal to the skill's `name`
 - exactly one `SKILL.md` in the archive (nested ones are rejected)
 
-A `.zip` is verified to work. A `.skill` file uploaded through this dialog is
+A `.zip` is verified to work, both when built by hand (`zip -r`, which adds
+directory entries) and when built by `scripts/package_skill.py --zip` (same
+files, no directory entries): the dialog accepted `skill-creator-plus.zip` from
+the packager on 2026-09-28. A `.skill` file uploaded through this dialog is
 not verified; the `.skill` route that *is* documented is the **Save skill**
 button on a file card in a chat that can present files. There is no upload
 API or CLI (open feature request: anthropics/claude-code#93163), so the user
 performs the upload in the UI and an agent cannot do it for them. Say that
 plainly rather than implying the skill is installed.
 
-After a change, the skill has to be re-zipped and re-uploaded. What happens
-when a same-name skill is uploaded again (replace or duplicate) has not been
-verified — check the Skills list afterwards and remove a stale copy.
+After a change, the skill has to be re-zipped and re-uploaded. Uploading a
+skill whose name already exists **replaces it in place** — verified on
+2026-09-28: the dialog offered to replace the older version, and afterwards
+`manifest.json` still held a single entry with the same `skillId` and
+`backingPluginId` (only `updatedAt` moved), the bundle folder matched the
+local copy file for file, and the sync logged `1 downloaded, 0 failed,
+0 removed, 0 orphans cleaned`. No stale duplicate is left behind. The
+Claude Code `synced/` copy lags by up to about ten minutes (or until the next
+session) before it shows the new version.
 
 ### Confirming it worked
 

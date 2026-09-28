@@ -13,10 +13,10 @@ Example:
 
 Both extensions are the same zip archive. `.skill` is what a file-delivery tool's
 "Save skill" card expects; `--zip` writes `<name>.zip`, the extension Claude
-Desktop's Customize > Skills > Upload a skill dialog is documented to take (and
-that six hand-built zips were uploaded with successfully). Those were made with
-`zip -r`; this script writes the same files without directory entries, which is
-standard but has not itself been through the dialog yet.
+Desktop's Customize > Skills > Upload a skill dialog takes. Both forms are
+verified: six hand-built zips (`zip -r`, with directory entries) and this
+script's own output (same files, no directory entries) were accepted by the
+dialog, the latter as a same-name replacement on 2026-09-28.
 `--all` packages every subfolder of <skills-directory> that contains a SKILL.md
 and reports a summary; it exits non-zero if any skill failed validation.
 """
