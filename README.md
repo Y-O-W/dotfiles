@@ -149,17 +149,29 @@ or can't be scripted at all:
 Run this before starting any work on the repo, not just when you remember to:
 
 ```sh
-bin/sync-dotfiles.sh
+bin/sync-dotfiles.sh                  # report drift and the diff; changes nothing
+bin/sync-dotfiles.sh ~/.zshrc ...     # pull only the files you name into the source
+bin/sync-dotfiles.sh --all            # pull every genuinely drifted file
 ```
 
 Local edits (tweaking `~/.zshrc` or `~/.claude/settings.json` directly instead of going through
 `chezmoi edit`) happen constantly, and if they never make it back into the source, a future
-restore silently reverts them — issue #14 nearly lost a `hooks` config to exactly this. The
-script runs `chezmoi diff`, pulls any drift it finds into the source with `chezmoi re-add`, and
-reports genuinely new, unmanaged files under `~/.claude/skills/` and `~/.claude/hooks/` that
-might be worth tracking (see issue #20). It never commits — drift can be a real improvement or
-something you don't actually want in the repo, and only you can tell the difference — so review
-with `git diff` before committing yourself.
+restore silently reverts them — issue #14 nearly lost a `hooks` config to exactly this. With no
+arguments the script only reports: the diff of each genuinely drifted file, plus genuinely new,
+unmanaged files under `~/.claude/skills/` and `~/.claude/hooks/` that might be worth tracking (see
+issue #20). It pulls into the source (`chezmoi re-add`) only what you name, or everything with
+`--all`. Reporting first is deliberate: a bare `chezmoi re-add` sweeps up every drifted file,
+including ones unrelated to the change you're making, so a commit about one skill ends up carrying
+unrelated settings. It never commits — drift can be a real improvement or something you don't
+actually want in the repo, and only you can tell the difference — so review with `git diff`
+before committing yourself.
+
+JSON files that an app rewrites in its own key order (`~/.claude/settings.json` is reordered every
+time Claude Code saves a setting) are compared as data. If a file equals its source apart from key
+order, the script lists it as "order-only drift ignored" and never pulls it, since that would only
+produce a meaningless commit. `chezmoi status` still lists such a file as modified. Files where the
+*source* is ahead of this machine (after a `git pull`) are listed separately, with the
+`chezmoi apply` command to update the machine, and are never treated as drift.
 
 For anything outside those paths, `chezmoi status` shows which managed targets have drifted, and
 `chezmoi unmanaged <path>...` lists untracked files under a given directory (never run it with no
@@ -170,7 +182,7 @@ script pick up the resulting drift:
 
 ```sh
 brew bundle dump --file="$HOME/.Brewfile" --force   # refresh ~/.Brewfile from what's installed
-bin/sync-dotfiles.sh                                  # pulls the refresh into the chezmoi source
+bin/sync-dotfiles.sh ~/.Brewfile                      # pulls just that refresh into the chezmoi source
 cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --rebase && git push
 ```
 
@@ -274,4 +286,4 @@ actual port is set per-project, not machine-wide.
 | `chezmoi re-add` | Pull local drift (edits made directly on a target) back into the source |
 | `chezmoi unmanaged <path>...` | List untracked files under the given path(s) |
 | `chezmoi source-path` | Print where the source directory lives locally |
-| `bin/sync-dotfiles.sh` | Pull all drift into source + report new unmanaged skill/hook files |
+| `bin/sync-dotfiles.sh` | Report drift (default), pull named files (`<path>...`) or all genuine drift (`--all`) into source, and report new unmanaged skill/hook files |
