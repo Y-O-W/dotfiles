@@ -48,6 +48,16 @@ This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still poin
   to execute, not a literal filename (worked around with the `literal_` prefix), and zero-byte
   files are dropped from the target state unless prefixed `empty_`. Built `bin/sync-dotfiles.sh`
   (issue #20) to make re-catching this kind of drift routine — see "Keeping this in sync" below.
+- **Updated (2026-09-28):** `skill-creator-plus` now covers Claude Desktop properly — folders
+  copied into Desktop's app directory are deleted at its next sync, so it packages a zip for
+  upload and verifies the registration instead (issue #21). `bin/sync-dotfiles.sh` was reworked to
+  report by default, pull only named files, and ignore order-only JSON drift such as
+  `~/.claude/settings.json` (see "Keeping this in sync" below; follow-up on issue #20). The
+  "Not tracked" note below now describes what `~/.claude/skills/synced/` really holds. The locally
+  modified `skill-creator` was **retired**: it differed from Anthropic's version by one added
+  paragraph (the landscape scan), which `skill-creator-plus` already contains, and it shared a name
+  and description with Anthropic's own copy. Anthropic's `skill-creator` still arrives through the
+  account sync; the removed files remain in this repo's git history.
 
 ## Managed with chezmoi
 
@@ -72,8 +82,7 @@ for install hooks):
 | `home/private_dot_claude/settings.json` | `~/.claude/settings.json` | Claude Code settings (0700 dir) |
 | `home/private_dot_claude/hooks/executable_skill-usage-tracker.py` | `~/.claude/hooks/skill-usage-tracker.py` | custom PostToolUse hook (skill usage logging), referenced by absolute path from `settings.json`'s `hooks` config |
 | `home/private_dot_claude/skills/change-to-github-epic/` | `~/.claude/skills/change-to-github-epic/` | custom Claude Code skill (OpenSpec change → GitHub epic) |
-| `home/private_dot_claude/skills/skill-creator/` | `~/.claude/skills/skill-creator/` | locally modified copy of Anthropic's skill-creator skill |
-| `home/private_dot_claude/skills/skill-creator-plus/` | `~/.claude/skills/skill-creator-plus/` | locally modified skill-creator variant with an added landscape-scan step |
+| `home/private_dot_claude/skills/skill-creator-plus/` | `~/.claude/skills/skill-creator-plus/` | custom skill-creator variant: landscape scan, usage-log review, and deployment tooling (Claude Code folder; Claude Desktop zip upload plus registration check) |
 | `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
 | `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
 | `home/dot_rails-templates/rails_new.rb` | `~/.rails-templates/rails_new.rb` | personal Rails app template (Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) used by the `rails-new` alias |
