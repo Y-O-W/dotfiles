@@ -419,23 +419,22 @@ Take `best_description` from the JSON output and update the skill's SKILL.md fro
 
 ## Deploying a finished skill locally
 
-When you're editing files directly on this machine (not exporting a `.skill` package for someone else to install), a finished skill should end up visible everywhere the user actually works, not just wherever this conversation happens to be running. Claude Code and Claude Desktop's agent/Cowork mode discover skills from two separate, non-overlapping locations — see `references/deployment-locations.md` for both paths and the mirroring procedure.
+When you're editing files directly on this machine (not exporting a `.skill` package for someone else to install), a finished skill should end up visible everywhere the user actually works, not just wherever this conversation happens to be running. Claude Code reads skills from a folder on disk; Claude Desktop's Chat and Cowork load only skills registered on the user's account, and a folder copied into Desktop's app directory is deleted at its next sync rather than registered — see `references/deployment-locations.md` for the evidence, both surfaces' procedures, and how to verify.
 
 Before treating a locally-copied skill as installed, check whether `~/.claude/skills` is itself managed by a dotfiles tool (chezmoi, etc.) rather than being the real source of truth — see `references/deployment-locations.md`'s dotfiles-sync section. If it is, copying a skill folder into it is not the last step.
 
-One landmine worth knowing before you consider any skill finished, regardless of environment: keep the frontmatter `description` as a single continuous line. Claude Code's discovery appears to silently drop a skill whose description is written as a multi-line YAML block scalar (`description: >` with indented continuation lines), with no error surfaced anywhere — this has been directly observed, not just suspected. If a draft ever ends up with a multi-line description, fold it back to one line before treating the skill as done.
+One landmine worth knowing before you consider any skill finished, regardless of environment: keep the frontmatter `description` as a single continuous line. Claude Code's discovery appears to silently drop a skill whose description is written as a multi-line YAML block scalar (`description: >` with indented continuation lines), with no error surfaced anywhere — this has been directly observed, not just suspected. If a draft ever ends up with a multi-line description, fold it back to one line before treating the skill as done. `scripts/quick_validate.py` (run automatically when packaging) now rejects it.
 
 ---
 
-### Package and Present (only if a file-delivery tool is available)
+### Package and Present
 
-Check whether you have access to a tool that presents files to the user — `present_files`, or `SendUserFile` in Cowork remote. If you have neither, skip this step. If you do, package the skill and send the user the resulting `.skill` file with that tool:
+Desktop's Chat and Cowork only see skills registered on the account, and uploading is the only supported way to register one — so packaging is the deploy step for those surfaces, not an optional extra. Build the file the way that fits your tools:
 
-```bash
-python -m scripts.package_skill <path/to/skill-folder>
-```
+- **You have a file-delivery tool** (`present_files`, or `SendUserFile` in Cowork remote): `python -m scripts.package_skill <path/to/skill-folder>`, then send the `.skill`. The file card shows a **Save skill** button when the user's org allows skill creation; clicking it installs the skill into their profile.
+- **You don't (typically Claude Code):** build a zip outside any repo or vault, e.g. `python -m scripts.package_skill <skill-folder> ~/Downloads/upload --zip` (`--all <skills-dir>` packages several at once), reveal it (`open -R <file>` on macOS), and give the click path: Customize → Skills → + → Create skill → Upload a skill. You can't perform the upload; say so instead of implying the skill is installed.
 
-The presented `.skill` (or bare `SKILL.md`) file card shows a **Save skill** button when the user's org allows skill creation; clicking it installs the skill into their profile.
+Once the user says they've uploaded, run `python -m scripts.verify_desktop_registration <skill-name> ...`. It's read-only and reports whether each skill is registered in Desktop's manifest, has reached Claude Code's synced mirror, or now exists twice (account copy plus a personal one). Don't edit that manifest or the folders beside it; `references/deployment-locations.md` explains why.
 
 ---
 

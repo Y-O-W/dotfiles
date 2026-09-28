@@ -5,8 +5,45 @@ Quick validation script for skills - minimal version
 
 import sys
 import re
-import yaml
 from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    # PyYAML is not installed everywhere (macOS system Python has none). Skill
+    # frontmatter is flat enough that the line-based fallback below is enough
+    # to validate it, so don't make packaging depend on a pip install.
+    yaml = None
+
+
+def _parse_frontmatter_fallback(frontmatter_text):
+    """Top-level `key: value` pairs only. Nested blocks (metadata, allowed-tools
+    lists) come back as empty strings, which is all the checks below need."""
+    data = {}
+    for line in frontmatter_text.splitlines():
+        m = re.match(r'^([A-Za-z0-9_-]+):\s*(.*)$', line)
+        if not m:
+            continue  # indented continuation, list item, or comment
+        key, value = m.group(1), m.group(2).strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+            value = value[1:-1]
+        data[key] = value
+    return data
+
+
+def _description_spans_lines(frontmatter_text):
+    """True if `description:` is a block scalar (`>` / `|`) or continues onto an
+    indented next line. Claude Code silently drops such skills from discovery."""
+    lines = frontmatter_text.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith('description:'):
+            continue
+        value = line.split(':', 1)[1].strip()
+        if re.match(r'^[>|][+-]?\d*$', value):
+            return True
+        nxt = lines[i + 1] if i + 1 < len(lines) else ''
+        return bool(nxt.strip()) and nxt[0] in ' \t'
+    return False
 
 # Directories whose contents are not packaged as part of the skill, so any
 # SKILL.md inside them shouldn't count toward the single-SKILL.md check below.
@@ -72,13 +109,26 @@ def validate_skill(skill_path):
 
     frontmatter_text = match.group(1)
 
+    # Checked on the raw text, before parsing: a real YAML parser happily accepts
+    # a block-scalar description, so this only shows up as a skill that quietly
+    # never appears in Claude Code.
+    if _description_spans_lines(frontmatter_text):
+        return False, (
+            "The `description` spans multiple lines (block scalar or indented "
+            "continuation). Claude Code's discovery silently drops such skills, "
+            "with no error anywhere. Put the whole description on one line."
+        )
+
     # Parse YAML frontmatter
-    try:
-        frontmatter = yaml.safe_load(frontmatter_text)
-        if not isinstance(frontmatter, dict):
-            return False, "Frontmatter must be a YAML dictionary"
-    except yaml.YAMLError as e:
-        return False, f"Invalid YAML in frontmatter: {e}"
+    if yaml is None:
+        frontmatter = _parse_frontmatter_fallback(frontmatter_text)
+    else:
+        try:
+            frontmatter = yaml.safe_load(frontmatter_text)
+            if not isinstance(frontmatter, dict):
+                return False, "Frontmatter must be a YAML dictionary"
+        except yaml.YAMLError as e:
+            return False, f"Invalid YAML in frontmatter: {e}"
 
     # Define allowed properties
     ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'}
@@ -86,9 +136,14 @@ def validate_skill(skill_path):
     # Check for unexpected properties (excluding nested keys under metadata)
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
     if unexpected_keys:
+        hint = ""
+        if 'version' in unexpected_keys:
+            # `version:` is a common habit but is not in the allowed set; `metadata`
+            # takes arbitrary string keys, so the value can be kept there instead.
+            hint = " To keep a version, nest it: `metadata:` then an indented `version: \"1.0\"`."
         return False, (
             f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}. "
-            f"Allowed properties are: {', '.join(sorted(ALLOWED_PROPERTIES))}"
+            f"Allowed properties are: {', '.join(sorted(ALLOWED_PROPERTIES))}.{hint}"
         )
 
     # Check required fields

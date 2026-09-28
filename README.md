@@ -85,10 +85,17 @@ for install hooks):
 they aren't machine config.
 
 **Not tracked, deliberately:** `~/.claude/skills/synced/` and `~/.claude/plugins/synced/` are
-Claude Code's own auto-refresh cache of skills sourced from Anthropic or an installed plugin —
-never hand-edited, and rebuilt automatically the moment Claude Code runs on a new machine. So is
-everything else under `~/.claude/` not listed in the table above (`projects/`, `cache/`,
-`telemetry/`, `history.jsonl`, etc.) — machine-local runtime state and logs, not config.
+Claude Code's own auto-refresh cache. `skills/synced/` mirrors the skills registered on the
+Claude account: Anthropic's built-in ones plus anything uploaded through Claude Desktop
+(Customize → Skills), such as `skill-creator-plus` and the Obsidian skills. It is never
+hand-edited, and it is rebuilt automatically the moment Claude Code runs on a new machine. That
+also means a skill that exists *only* as an upload lives nowhere in this repo: a skill you author
+or modify locally belongs in `~/.claude/skills/<name>/` (tracked below), and the upload is a copy
+derived from it. Claude Desktop's own skills folder is a cache of the same account skills; copying
+a folder into it registers nothing and is deleted at its next sync.
+
+Also untracked: everything else under `~/.claude/` not listed in the table above (`projects/`,
+`cache/`, `telemetry/`, `history.jsonl`, etc.) — machine-local runtime state and logs, not config.
 
 ### First-time setup on a new machine
 
