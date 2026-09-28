@@ -57,7 +57,11 @@ This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still poin
   modified `skill-creator` was **retired**: it differed from Anthropic's version by one added
   paragraph (the landscape scan), which `skill-creator-plus` already contains, and it shared a name
   and description with Anthropic's own copy. Anthropic's `skill-creator` still arrives through the
-  account sync; the removed files remain in this repo's git history.
+  account sync; the removed files remain in this repo's git history. This repo is now the **one
+  home for every personal skill and hook**, including vendored third-party skills (issue #23): the
+  six `kepano/obsidian-skills` moved here from the Obsidian vault, with their provenance pinned in
+  `vendor/kepano-obsidian-skills/UPSTREAM.md`, and `skill-creator-plus` gained a check that flags
+  any skill that exists only on the Claude account. See "One home per skill" below.
 
 ## Managed with chezmoi
 
@@ -83,6 +87,7 @@ for install hooks):
 | `home/private_dot_claude/hooks/executable_skill-usage-tracker.py` | `~/.claude/hooks/skill-usage-tracker.py` | custom PostToolUse hook (skill usage logging), referenced by absolute path from `settings.json`'s `hooks` config |
 | `home/private_dot_claude/skills/change-to-github-epic/` | `~/.claude/skills/change-to-github-epic/` | custom Claude Code skill (OpenSpec change → GitHub epic) |
 | `home/private_dot_claude/skills/skill-creator-plus/` | `~/.claude/skills/skill-creator-plus/` | custom skill-creator variant: landscape scan, usage-log review, and deployment tooling (Claude Code folder; Claude Desktop zip upload plus registration check) |
+| `home/private_dot_claude/skills/{defuddle,json-canvas,knap,obsidian-bases,obsidian-cli,obsidian-markdown}/` | `~/.claude/skills/<name>/` | the six vendored `kepano/obsidian-skills` skills, as plain copies (pin and update procedure: `vendor/kepano-obsidian-skills/UPSTREAM.md`) |
 | `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
 | `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
 | `home/dot_rails-templates/rails_new.rb` | `~/.rails-templates/rails_new.rb` | personal Rails app template (Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) used by the `rails-new` alias |
@@ -90,8 +95,37 @@ for install hooks):
 | `home/.chezmoiscripts/run_onchange_after_10-install-packages-darwin.sh.tmpl` | — | runs `brew bundle` whenever `dot_Brewfile` changes |
 | `home/.chezmoiscripts/run_onchange_after_20-bootstrap-ruby.sh.tmpl` | — | installs/sets the pinned Ruby via rbenv whenever `dot_ruby-version` changes |
 
-`README.md` and `LICENSE` at the repo root are outside `home/` and untouched by chezmoi, as
-they aren't machine config.
+`README.md`, `LICENSE` and `vendor/` at the repo root are outside `home/` and untouched by chezmoi,
+as they aren't machine config. `vendor/<package>/` holds the provenance pin for each vendored
+third-party package.
+
+### One home per skill
+
+Every skill and hook has exactly one home: a folder tracked in a git repository with a remote,
+and scope decides which repo. Personal or general skills and hooks, including vendored
+third-party skills, live **here**, as plain tracked copies deployed by `chezmoi apply`. Only
+something genuinely about one project belongs in that project's own repo (a vault's guardrail
+hooks, say), and a skill kept in a project's `.claude/skills/` stops being project-scoped as soon
+as it is uploaded, because uploaded skills are account-wide. The Claude account copy, Claude
+Desktop's cache and Claude Code's `synced/` cache are all derived from the home, never the source,
+and none of them is a backup: nothing exports from the account.
+
+- **Vendored third-party skills** are copied in as plain files, not fetched by a chezmoi external
+  (a failing `git-repo` external aborts the whole `chezmoi apply`, and a restore would depend on the
+  network and on upstream still existing; see issue #23 for the test results). Provenance goes in
+  `vendor/<package>/UPSTREAM.md`: source URL, full commit SHA, upstream version, license, the
+  date the copies were verified against upstream, local modifications, and the update procedure.
+- **A skill created only in Claude Desktop's UI** exists solely on the account, so author locally
+  and then upload. To catch an exception, run from `~/.claude/skills/skill-creator-plus/`:
+
+  ```sh
+  python3 -m scripts.check_skill_backup            # flag skills with no pushed home
+  python3 -m scripts.check_skill_backup --harvest  # also copy account-only skills out of Desktop's cache
+  ```
+
+  "Backed up" means tracked by chezmoi, no live edits waiting to be pulled in, and nothing
+  uncommitted or unpushed. `--harvest` puts an account-only skill in `~/.claude/skills/<name>/` and
+  prints the `chezmoi add` to run next; commit and push yourself.
 
 **Not tracked, deliberately:** `~/.claude/skills/synced/` and `~/.claude/plugins/synced/` are
 Claude Code's own auto-refresh cache. `skills/synced/` mirrors the skills registered on the

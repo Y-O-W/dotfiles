@@ -436,6 +436,8 @@ Desktop's Chat and Cowork only see skills registered on the account, and uploadi
 
 Once the user says they've uploaded, run `python -m scripts.verify_desktop_registration <skill-name> ...`. It's read-only and reports whether each skill is registered in Desktop's manifest, has reached Claude Code's synced mirror, or now exists twice (account copy plus a personal one). Don't edit that manifest or the folders beside it; `references/deployment-locations.md` explains why.
 
+Every skill also needs exactly one git-backed home, because the account copy is not a backup. After creating or uploading one, run `python -m scripts.check_skill_backup`: it flags any skill that exists only on the account or has no pushed home, and `--harvest` copies an account-only skill out of Desktop's cache. The rule and its reasoning are in `references/deployment-locations.md` ("One home per skill").
+
 ---
 
 ## Claude.ai-specific instructions

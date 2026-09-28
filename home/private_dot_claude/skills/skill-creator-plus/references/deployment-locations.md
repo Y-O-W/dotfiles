@@ -139,16 +139,51 @@ uploading.
    repo or vault (`~/Downloads/...`) so nothing commits it. Give the click
    path above, then run the verification command once the user says they've
    uploaded.
-3. **Once registered,** the account copy syncs into Claude Code as well. A
-   personal copy of the same name is then a duplicate, and which one Claude
-   Code loads has not been verified. `verify_desktop_registration` flags
-   duplicates; decide deliberately which copy is the source of truth (a
-   vault- or dotfiles-versioned copy usually is) rather than keeping three
-   silently.
+3. **Once registered,** the account copy syncs into Claude Code as well.
+   Claude Code lists the personal copy and the account copy as separate
+   entries (the account ones carry an `anthropic-skills:` prefix), so they
+   don't collide by name; the cost is the description appearing twice. Which
+   one is used when a request matches both has not been verified.
+   `verify_desktop_registration` flags a skill that exists both ways.
 4. If Desktop isn't installed or agent mode has never been used, skip the
    Desktop step rather than creating directories speculatively.
 
 Tell the user which surfaces were done, and which need them.
+
+## One home per skill, and backing it up
+
+Every skill has exactly one **home**: a folder tracked in a git repository with
+a remote. Scope decides which repo. Personal or general skills, and vendored
+third-party skills, live in the dotfiles repo as plain tracked copies (deployed
+to `~/.claude/skills/<name>/` by chezmoi). Only something genuinely about one
+project belongs in that project's `.claude/skills/`, and only if it will not be
+uploaded: an uploaded skill is account-wide, so project scoping stops holding.
+The account copy, Desktop's cache and Claude Code's `synced/` cache are always
+derived, never the source, and none of them is a backup — nothing exports from
+the account.
+
+That leaves one gap: a skill created *only* in Desktop's UI exists solely on the
+account. Author locally and then upload. To catch an exception:
+
+```bash
+python3 -m scripts.check_skill_backup            # report
+python3 -m scripts.check_skill_backup --harvest  # also copy account-only skills out
+```
+
+It lists the skills you uploaded (`creatorType: "user"`, Anthropic's are skipped)
+and the folders in `~/.claude/skills`, and flags any without a *pushed* home:
+"backed up" means tracked by chezmoi, no live edits still waiting to be pulled
+in, nothing uncommitted, nothing unpushed. `--harvest` copies an account-only
+skill from Desktop's cache — a complete copy, but only a cache, so do it soon —
+into `~/.claude/skills/<name>/`, never overwriting, and prints the
+`chezmoi add` to run next. It doesn't touch the repo itself, since chezmoi
+renames some files in its source tree.
+
+A vendored third-party package additionally needs a pin file outside the
+deployed tree: source URL, full commit SHA, upstream version, license, the date
+the copies were verified against upstream, and the update procedure. Copy the
+files as plain copies; a chezmoi `git-repo` external was tested and is not a
+good fit (a failing external aborts the whole `chezmoi apply`).
 
 ## If `~/.claude/skills` is dotfiles-managed
 
