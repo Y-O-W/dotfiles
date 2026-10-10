@@ -79,7 +79,8 @@ for install hooks):
 | `home/dot_irbrc` | `~/.irbrc` | IRB config |
 | `home/dot_pryrc` | `~/.pryrc` | Pry prompt config |
 | `home/dot_rspec` | `~/.rspec` | RSpec config |
-| `home/dot_vimrc` | `~/.vimrc` | Vim config (C-focused: tabs, 4-width indent, 80-col guide for 42 Norm) |
+| `home/dot_vimrc.tmpl` | `~/.vimrc` | Vim config (C-focused: tabs, 4-width indent, 80-col guide for 42 Norm); 42 login/email come from chezmoi data, not the repo |
+| `home/dot_vim/plugin/stdheader.vim` | `~/.vim/plugin/stdheader.vim` | 42 header plugin (reads `g:user42` / `g:mail42` from `.vimrc`) |
 | `home/dot_Brewfile` | `~/.Brewfile` | Homebrew formulae/casks/taps snapshot |
 | `home/dot_ruby-version` | `~/.ruby-version` | pinned default Ruby version for rbenv |
 | `home/private_dot_ssh/private_config` | `~/.ssh/config` | SSH config (0700/0600) |
@@ -153,6 +154,9 @@ Also untracked: everything else under `~/.claude/` not listed in the table above
    brew install chezmoi
    chezmoi init --apply --ssh Y-O-W/dotfiles
    ```
+   chezmoi prompts once for your 42 login and email (`home/.chezmoi.toml.tmpl`); they are stored in
+   `~/.config/chezmoi/chezmoi.toml` and rendered into `.vimrc`, never committed.
+
    This one command now does more than write dotfiles — it also:
    - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.gitignore_global`, `.irbrc`, `.pryrc`,
      `.rspec`, `.vimrc`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and
@@ -170,7 +174,9 @@ Also untracked: everything else under `~/.claude/` not listed in the table above
 
 By default chezmoi's source directory is `~/.local/share/chezmoi`. On this machine it's
 instead pinned to the existing clone (`~/Developer/personal/dotfiles`) via `sourceDir` in
-`~/.config/chezmoi/chezmoi.toml` — update that path if the repo is ever moved.
+`~/.config/chezmoi/chezmoi.toml` — update that path if the repo is ever moved. Don't run
+`chezmoi init` on this machine to "fix" the config-template warning: it would regenerate the file
+and drop `sourceDir`.
 
 ### Manual-only steps
 
