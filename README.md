@@ -1,338 +1,135 @@
+# Dotfiles
 
-# Development Environment Recovery System - Chezmoi Dotfiles Manager
+Personal dev environment, managed with [chezmoi](https://www.chezmoi.io/). `home/` is the source
+root (set by `.chezmoiroot`); the repo is expected at `~/Developer/personal/dotfiles`.
 
-## Fork status (as of 2026-07-14)
+## Setup
 
-This is a personal fork (`origin` = `Y-O-W/dotfiles`) with `upstream` still pointing at
-[`lewagon/dotfiles`](https://github.com/lewagon/dotfiles) for pulling future curriculum updates.
+### New machine
 
-- **Currency:** fully up to date — 0 commits behind `upstream/master` (last upstream commit:
-  2025-12-02), plus personal commits on top.
-- **Good practices already in place:** fork + upstream remote (get updates without losing
-  customizations), no secrets committed (git credentials go through `gh auth git-credential`,
-  SSH config only references Keychain).
-- **Known gaps (resolved 2026-07-14):** this repo used to be managed via a hand-rolled
-  `install.sh` doing raw `ln -s` into `$HOME`, with no dry-run/diff-before-apply or
-  per-machine templating. It's now managed with [chezmoi](https://www.chezmoi.io/) instead —
-  see the section below. It also contains personal content (e.g. the `render-cv` alias)
-  unrelated to the bootcamp template, so it functions as personal dotfiles rather than a
-  clean Le Wagon template — which is fine, since that's the intent of this fork.
-- **Recommendation (done 2026-07-14):** keep this fork rather than starting a separate
-  personal dotfiles repo. Relocated from `~/code/Y-O-W/dotfiles` (the bootcamp's original
-  setup convention) to `~/Developer/personal/dotfiles`.
-- **Extended (2026-07-14):** this repo now covers the whole local dev environment, not just
-  dotfiles — Homebrew packages, rbenv/Ruby, VS Code settings, SSH config, and Claude Code
-  config are all chezmoi-managed too. See "First-time setup on a new machine" below. The old
-  `install.sh`, `git_setup.sh`, and loose root-level `pryrc`/`zprofile`/`config`/
-  `settings.json`/`keybindings.json` files have been retired — everything they used to handle
-  now lives under `home/` and is actually applied by `chezmoi apply`, rather than sitting
-  around as unapplied reference copies.
-- **Verified (2026-08-24):** still 0 commits behind `upstream/master` (last upstream commit
-  unchanged, 2025-12-02). `chezmoi diff` turned up real drift: `~/.zshrc` and
-  `~/.claude/settings.json` had been edited directly on this machine (PATH dedup, a
-  per-project `bin`/`node_modules/.bin` PATH hook, an async-cached `$GITHUB_USERNAME` lookup,
-  `zsh-autosuggestions` enabled, plus two extra Claude settings keys) without those changes
-  ever being pulled back into the chezmoi source — a real gap for a "recovery" repo, since
-  restoring from it would have silently reverted those improvements. Pulled in with
-  `chezmoi re-add` and applied. Also fixed a stale README claim (`postgresql@17` no longer
-  needs manual starting — the Brewfile now flags it `restart_service: :changed` same as
-  `postgresql@15`) and documented the previously-unlisted oh-my-zsh bootstrap script
-  (`run_once_after_00-install-oh-my-zsh.sh.tmpl`) and `dot_gitignore_global`.
-- **Extended (2026-09-23):** audited `~/.claude/` end-to-end (issue #14) — only `settings.json`
-  was tracked; a custom hook (`hooks/skill-usage-tracker.py`) and three hand-modified skills
-  (`change-to-github-epic`, `skill-creator`, `skill-creator-plus`) existed only on this machine
-  and were now added. `~/.claude/skills/synced/` deliberately stayed untracked — see the note
-  under "Managed with chezmoi" below. Adding it also surfaced real `settings.json` drift (a
-  `hooks` block missing from source that `chezmoi apply` would have silently deleted) and two
-  chezmoi naming gotchas: a bare `run_` prefix anywhere in the source tree is parsed as a script
-  to execute, not a literal filename (worked around with the `literal_` prefix), and zero-byte
-  files are dropped from the target state unless prefixed `empty_`. Built `bin/sync-dotfiles.sh`
-  (issue #20) to make re-catching this kind of drift routine — see "Keeping this in sync" below.
-- **Updated (2026-09-28):** `skill-creator-plus` now covers Claude Desktop properly — folders
-  copied into Desktop's app directory are deleted at its next sync, so it packages a zip for
-  upload and verifies the registration instead (issue #21). `bin/sync-dotfiles.sh` was reworked to
-  report by default, pull only named files, and ignore order-only JSON drift such as
-  `~/.claude/settings.json` (see "Keeping this in sync" below; follow-up on issue #20). The
-  "Not tracked" note below now describes what `~/.claude/skills/synced/` really holds. The locally
-  modified `skill-creator` was **retired**: it differed from Anthropic's version by one added
-  paragraph (the landscape scan), which `skill-creator-plus` already contains, and it shared a name
-  and description with Anthropic's own copy. Anthropic's `skill-creator` still arrives through the
-  account sync; the removed files remain in this repo's git history. This repo is now the **one
-  home for every personal skill and hook**, including vendored third-party skills (issue #23): the
-  six `kepano/obsidian-skills` moved here from the Obsidian vault, with their provenance pinned in
-  `vendor/kepano-obsidian-skills/UPSTREAM.md`, and `skill-creator-plus` gained a check that flags
-  any skill that exists only on the Claude account. See "One home per skill" below.
-
-## Managed with chezmoi
-
-This repo is managed with [chezmoi](https://www.chezmoi.io/). `home/` is the chezmoi source
-root (declared via `.chezmoiroot`) and contains every managed file, using chezmoi's naming
-conventions (`dot_` for a leading dot, `private_` for tightened permissions, `.chezmoiscripts/`
-for install hooks):
-
-| Source path | Target | What it is |
-|---|---|---|
-| `home/dot_zshrc` | `~/.zshrc` | shell config |
-| `home/dot_zprofile` | `~/.zprofile` | login shell env (`brew shellenv`, pyenv PATH) |
-| `home/dot_gitconfig` | `~/.gitconfig` | git config/aliases |
-| `home/dot_aliases` | `~/.aliases` | personal shell aliases |
-| `home/dot_irbrc` | `~/.irbrc` | IRB config |
-| `home/dot_pryrc` | `~/.pryrc` | Pry prompt config |
-| `home/dot_rspec` | `~/.rspec` | RSpec config |
-| `home/dot_vimrc.tmpl` | `~/.vimrc` | Vim config (C-focused: tabs, 4-width indent, 80-col guide for 42 Norm); 42 login/email come from chezmoi data, not the repo |
-| `home/dot_vim/plugin/stdheader.vim` | `~/.vim/plugin/stdheader.vim` | 42 header plugin (reads `g:user42` / `g:mail42` from `.vimrc`) |
-| `home/dot_Brewfile` | `~/.Brewfile` | Homebrew formulae/casks/taps snapshot |
-| `home/dot_ruby-version` | `~/.ruby-version` | pinned default Ruby version for rbenv |
-| `home/private_dot_ssh/private_config` | `~/.ssh/config` | SSH config (0700/0600) |
-| `home/private_dot_claude/settings.json` | `~/.claude/settings.json` | Claude Code settings (0700 dir) |
-| `home/private_dot_claude/hooks/executable_skill-usage-tracker.py` | `~/.claude/hooks/skill-usage-tracker.py` | custom PostToolUse hook (skill usage logging), referenced by absolute path from `settings.json`'s `hooks` config |
-| `home/private_dot_claude/skills/change-to-github-epic/` | `~/.claude/skills/change-to-github-epic/` | custom Claude Code skill (OpenSpec change → GitHub epic) |
-| `home/private_dot_claude/skills/skill-creator-plus/` | `~/.claude/skills/skill-creator-plus/` | custom skill-creator variant: landscape scan, usage-log review, and deployment tooling (Claude Code folder; Claude Desktop zip upload plus registration check) |
-| `home/private_dot_claude/skills/{defuddle,json-canvas,knap,obsidian-bases,obsidian-cli,obsidian-markdown}/` | `~/.claude/skills/<name>/` | the six vendored `kepano/obsidian-skills` skills, as plain copies (pin and update procedure: `vendor/kepano-obsidian-skills/UPSTREAM.md`) |
-| `home/private_Library/private_Application Support/private_Code/User/settings.json` | VS Code `settings.json` | editor settings |
-| `home/dot_gitignore_global` | `~/.gitignore_global` | global gitignore (referenced by `dot_gitconfig`'s `core.excludesFile`) |
-| `home/dot_rails-templates/rails_new.rb` | `~/.rails-templates/rails_new.rb` | personal Rails app template (Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) used by the `rails-new` alias |
-| `home/.chezmoiscripts/run_once_after_00-install-oh-my-zsh.sh.tmpl` | — | installs oh-my-zsh and its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins the first time chezmoi runs on a machine |
-| `home/.chezmoiscripts/run_onchange_after_10-install-packages-darwin.sh.tmpl` | — | runs `brew bundle` whenever `dot_Brewfile` changes |
-| `home/.chezmoiscripts/run_onchange_after_20-bootstrap-ruby.sh.tmpl` | — | installs/sets the pinned Ruby via rbenv whenever `dot_ruby-version` changes |
-
-`README.md`, `LICENSE` and `vendor/` at the repo root are outside `home/` and untouched by chezmoi,
-as they aren't machine config. `vendor/<package>/` holds the provenance pin for each vendored
-third-party package.
-
-### One home per skill
-
-Every skill and hook has exactly one home: a folder tracked in a git repository with a remote,
-and scope decides which repo. Personal or general skills and hooks, including vendored
-third-party skills, live **here**, as plain tracked copies deployed by `chezmoi apply`. Only
-something genuinely about one project belongs in that project's own repo (a vault's guardrail
-hooks, say), and a skill kept in a project's `.claude/skills/` stops being project-scoped as soon
-as it is uploaded, because uploaded skills are account-wide. The Claude account copy, Claude
-Desktop's cache and Claude Code's `synced/` cache are all derived from the home, never the source,
-and none of them is a backup: nothing exports from the account.
-
-- **Vendored third-party skills** are copied in as plain files, not fetched by a chezmoi external
-  (a failing `git-repo` external aborts the whole `chezmoi apply`, and a restore would depend on the
-  network and on upstream still existing; see issue #23 for the test results). Provenance goes in
-  `vendor/<package>/UPSTREAM.md`: source URL, full commit SHA, upstream version, license, the
-  date the copies were verified against upstream, local modifications, and the update procedure.
-- **A skill created only in Claude Desktop's UI** exists solely on the account, so author locally
-  and then upload. To catch an exception, run from `~/.claude/skills/skill-creator-plus/`:
-
-  ```sh
-  python3 -m scripts.check_skill_backup            # flag skills with no pushed home
-  python3 -m scripts.check_skill_backup --harvest  # also copy account-only skills out of Desktop's cache
-  ```
-
-  "Backed up" means tracked by chezmoi, no live edits waiting to be pulled in, and nothing
-  uncommitted or unpushed. `--harvest` puts an account-only skill in `~/.claude/skills/<name>/` and
-  prints the `chezmoi add` to run next; commit and push yourself.
-
-**Not tracked, deliberately:** `~/.claude/skills/synced/` and `~/.claude/plugins/synced/` are
-Claude Code's own auto-refresh cache. `skills/synced/` mirrors the skills registered on the
-Claude account: Anthropic's built-in ones plus anything uploaded through Claude Desktop
-(Customize → Skills), such as `skill-creator-plus` and the Obsidian skills. It is never
-hand-edited, and it is rebuilt automatically the moment Claude Code runs on a new machine. That
-also means a skill that exists *only* as an upload lives nowhere in this repo: a skill you author
-or modify locally belongs in `~/.claude/skills/<name>/` (tracked below), and the upload is a copy
-derived from it. Claude Desktop's own skills folder is a cache of the same account skills; copying
-a folder into it registers nothing and is deleted at its next sync.
-
-Also untracked: everything else under `~/.claude/` not listed in the table above (`projects/`,
-`cache/`, `telemetry/`, `history.jsonl`, etc.) — machine-local runtime state and logs, not config.
-
-### First-time setup on a new machine
-
-1. Install Xcode Command Line Tools if prompted (`xcode-select --install`) — required by
-   Homebrew, and involves a license prompt that can't be scripted.
+1. `xcode-select --install` (if prompted).
 2. Install Homebrew:
    ```sh
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
-3. Install chezmoi and apply this repo:
+3. Clone to the expected path, then install chezmoi and apply:
    ```sh
+   git clone https://github.com/Y-O-W/dotfiles.git ~/Developer/personal/dotfiles
    brew install chezmoi
-   chezmoi init --apply --ssh Y-O-W/dotfiles
+   chezmoi init --apply --source ~/Developer/personal/dotfiles
    ```
-   chezmoi prompts once for your 42 login and email (`home/.chezmoi.toml.tmpl`); they are stored in
+   You're prompted once for your 42 login and email. They're stored in
    `~/.config/chezmoi/chezmoi.toml` and rendered into `.vimrc`, never committed.
+4. Do the [manual steps](#manual-steps).
 
-   This one command now does more than write dotfiles — it also:
-   - writes `.zshrc`, `.zprofile`, `.gitconfig`, `.gitignore_global`, `.irbrc`, `.pryrc`,
-     `.rspec`, `.vimrc`, `.aliases`, `~/.ssh/config`, VS Code `settings.json`, and
-     `~/.claude/settings.json`, `~/.claude/hooks/`, and `~/.claude/skills/` (custom skills only —
-     see below) into place,
-   - installs oh-my-zsh plus its `zsh-syntax-highlighting`/`zsh-autosuggestions` custom plugins
-     (only on first run, if `~/.oh-my-zsh` doesn't already exist),
-   - installs every Homebrew formula/cask/tap/vscode-extension/npm-global-package in
-     `~/.Brewfile` (including `postgresql@15` and `postgresql@17`, both flagged
-     `restart_service: :changed`, so Homebrew starts both automatically on a fresh install since
-     both count as newly installed),
-   - moves `postgresql@17` to port 5433 (see "New apps default to Ruby 4.0 / PostgreSQL 17"
-     below) so it doesn't fail to bind against `postgresql@15` on the default 5432,
-   - installs rbenv's pinned Ruby version (`~/.ruby-version`) and sets it as the rbenv global.
+`apply` writes the dotfiles, installs oh-my-zsh and its plugins, runs `brew bundle` on
+`~/.Brewfile` (moving `postgresql@17` to port 5433), and installs the pinned Ruby via rbenv.
 
-By default chezmoi's source directory is `~/.local/share/chezmoi`. On this machine it's
-instead pinned to the existing clone (`~/Developer/personal/dotfiles`) via `sourceDir` in
-`~/.config/chezmoi/chezmoi.toml` — update that path if the repo is ever moved. Don't run
-`chezmoi init` on this machine to "fix" the config-template warning: it would regenerate the file
-and drop `sourceDir`.
-
-### Manual-only steps
-
-A few things intentionally aren't automated, either because they need a human judgment call
-or can't be scripted at all:
-
-- **Load your SSH key into the keychain:** `ssh-add --apple-use-keychain ~/.ssh/id_ed25519`.
-  The private key itself is never chezmoi-managed (it's not in this repo) — it needs to
-  already exist or be restored from wherever it's backed up first.
-- **Authenticate `gh`:** `gh auth login`. Needed for `dot_gitconfig`'s credential helper
-  (`gh auth git-credential`) and `dot_zshrc`'s `$GITHUB_USERNAME` (`gh api user`).
-- **Mac App Store / GUI-only apps, and Rosetta 2** (`softwareupdate --install-rosetta`, if you
-  ever need an Intel-only tool): out of scope for this repo — `brew bundle` doesn't manage MAS
-  apps unless run with `--mas`, which is deliberately not used here to keep the Brewfile to
-  what Homebrew itself tracks.
-
-### Keeping this in sync
-
-Run this before starting any work on the repo, not just when you remember to:
+### Existing machine
 
 ```sh
-bin/sync-dotfiles.sh                  # report drift and the diff; changes nothing
-bin/sync-dotfiles.sh ~/.zshrc ...     # pull only the files you name into the source
-bin/sync-dotfiles.sh --all            # pull every genuinely drifted file
+cd ~/Developer/personal/dotfiles
+bin/sync-dotfiles.sh          # 1. report local drift (changes nothing)
+bin/sync-dotfiles.sh <path>…  # 2. pull the drift you want to keep (or --all)
+git diff                      # 3. review, then commit and push yourself
+git pull --rebase && chezmoi apply   # 4. take changes from other machines
 ```
 
-Local edits (tweaking `~/.zshrc` or `~/.claude/settings.json` directly instead of going through
-`chezmoi edit`) happen constantly, and if they never make it back into the source, a future
-restore silently reverts them — issue #14 nearly lost a `hooks` config to exactly this. With no
-arguments the script only reports: the diff of each genuinely drifted file, plus genuinely new,
-unmanaged files under `~/.claude/skills/` and `~/.claude/hooks/` that might be worth tracking (see
-issue #20). It pulls into the source (`chezmoi re-add`) only what you name, or everything with
-`--all`. Reporting first is deliberate: a bare `chezmoi re-add` sweeps up every drifted file,
-including ones unrelated to the change you're making, so a commit about one skill ends up carrying
-unrelated settings. It never commits — drift can be a real improvement or something you don't
-actually want in the repo, and only you can tell the difference — so review with `git diff`
-before committing yourself.
+- Run the sync script before starting work: edits made directly on a target (`~/.zshrc`,
+  `~/.claude/settings.json`) are lost on restore unless pulled into the source.
+- JSON files an app rewrites in its own key order (`settings.json`) are compared as data;
+  order-only drift is ignored.
+- "config file template has changed" warning: run `chezmoi init`. The template sets `sourceDir`,
+  so the config keeps pointing at this repo.
+- After `brew install`/`uninstall`: `brew bundle dump --file="$HOME/.Brewfile" --force`, then
+  `bin/sync-dotfiles.sh ~/.Brewfile`.
 
-JSON files that an app rewrites in its own key order (`~/.claude/settings.json` is reordered every
-time Claude Code saves a setting) are compared as data. If a file equals its source apart from key
-order, the script lists it as "order-only drift ignored" and never pulls it, since that would only
-produce a meaningless commit. `chezmoi status` still lists such a file as modified. Files where the
-*source* is ahead of this machine (after a `git pull`) are listed separately, with the
-`chezmoi apply` command to update the machine, and are never treated as drift.
+### Manual steps
 
-For anything outside those paths, `chezmoi status` shows which managed targets have drifted, and
-`chezmoi unmanaged <path>...` lists untracked files under a given directory (never run it with no
-path — it scans the whole home directory).
+- `ssh-add --apple-use-keychain ~/.ssh/id_ed25519` (the private key is not in this repo).
+- `gh auth login` (needed by the git credential helper and `$GITHUB_USERNAME` in `.zshrc`).
+- Mac App Store apps and Rosetta are out of scope.
 
-Refresh the Homebrew snapshot whenever you install/remove a brew package, then let the sync
-script pick up the resulting drift:
+## What's managed
+
+| Source (under `home/`) | Target |
+|---|---|
+| `dot_zshrc`, `dot_zprofile`, `dot_aliases` | shell config, login env, aliases |
+| `dot_gitconfig`, `dot_gitignore_global` | git config, global ignore |
+| `dot_irbrc`, `dot_pryrc`, `dot_rspec` | IRB, Pry, RSpec |
+| `dot_vimrc.tmpl`, `dot_vim/plugin/stdheader.vim` | Vim (42 Norm) and 42 header plugin; login/email from chezmoi data |
+| `dot_Brewfile`, `dot_ruby-version` | Homebrew snapshot, pinned rbenv Ruby |
+| `private_dot_ssh/private_config` | `~/.ssh/config` (0600) |
+| `private_dot_claude/` | `~/.claude/` settings, hook, and custom skills |
+| `private_Library/…/Code/User/settings.json` | VS Code settings |
+| `dot_rails-templates/rails_new.rb` | Rails template used by the `rails-new` alias |
+| `.chezmoiscripts/` | oh-my-zsh (once), `brew bundle` and Ruby (on change) |
+
+Outside `home/` and not managed: `bin/`, `vendor/`, `README.md`, `LICENSE`.
+Untracked on purpose: `~/.claude/skills/synced/`, `~/.claude/plugins/synced/` (Claude's own caches),
+and runtime state in `~/.claude/` (`projects/`, `cache/`, `history.jsonl`, …).
+`home/.chezmoiignore` skips `.DS_Store` and `__pycache__`.
+
+### Skills
+
+Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.
+Claude Desktop uploads and the `synced/` cache are derived copies, not backups. Vendored
+third-party skills (`kepano/obsidian-skills`) have their provenance pinned in
+`vendor/kepano-obsidian-skills/UPSTREAM.md`. To find skills that exist only on the Claude account:
 
 ```sh
-brew bundle dump --file="$HOME/.Brewfile" --force   # refresh ~/.Brewfile from what's installed
-bin/sync-dotfiles.sh ~/.Brewfile                      # pulls just that refresh into the chezmoi source
-cd "$(chezmoi source-path)" && git add -A && git commit -m "..." && git pull --rebase && git push
+cd ~/.claude/skills/skill-creator-plus
+python3 -m scripts.check_skill_backup             # flag skills with no pushed home
+python3 -m scripts.check_skill_backup --harvest   # also copy account-only skills out of Desktop's cache
 ```
 
-Bump `home/dot_ruby-version` the same way when you switch Ruby versions — `chezmoi apply` will
-install and switch to it automatically on every machine next time you `chezmoi update`.
+## Dev versions
 
-### Keeping Ruby/Homebrew/PostgreSQL current
+- `bin/update-dev-versions.sh` bumps Ruby to the latest patch of the pinned minor line, upgrades
+  Brewfile packages, refreshes the snapshot, applies it and commits (never pushes).
+- It only reports, never applies: Ruby minor/major bumps, PostgreSQL major bumps (need
+  `pg_upgrade` or dump/restore), and Rails (pinned per project).
+- **New apps** use Ruby `4.0.6` (global pin; existing apps keep their own `.ruby-version`) and
+  PostgreSQL 17 on port 5433, alongside `postgresql@15` on 5432. `rails-new my_app` expands to
+  `rails new -d postgresql -m ~/.rails-templates/rails_new.rb`, which sets `port: 5433`.
 
-`bin/update-dev-versions.sh` automates the safe part of this: it bumps the Ruby pin to the
-latest patch within the currently pinned minor line, runs `brew bundle install --upgrade` so
-every Brewfile-tracked formula/cask (including `postgresql@15`/`postgresql@17`) is on its
-latest point release, refreshes the Brewfile snapshot, applies the change locally, and commits
-— but it never pushes, so you can review with `git show` first. Run it with:
+### Dev server ports
 
-```sh
-bin/update-dev-versions.sh
-```
-
-It deliberately does **not** auto-apply three things, since each needs a human call:
-- **Ruby minor/major bumps** (e.g. 3.3.x → 3.4.x or 4.0.x) — new lines can break native
-  extensions in existing gems, so the script only reports that a newer line exists.
-- **PostgreSQL major-version bumps** (e.g. `postgresql@17` → `postgresql@18`) — this needs
-  `pg_upgrade` or a dump/restore of your actual databases, not just a formula swap. The script
-  reports when a newer major is available; bump the Brewfile yourself once you've migrated data.
-- **Rails** — it's a per-project gem pinned in each app's `Gemfile.lock`, not something dotfiles
-  can own globally. The script just flags if the global `rails` gem is outdated; bump each
-  project with `bundle update rails --conservative`.
-
-The same drift risk applies to any managed file, not just the Brewfile — see
-"Keeping this in sync" above for `bin/sync-dotfiles.sh`, which catches this generally.
-
-### New apps default to Ruby 4.0 / PostgreSQL 17
-
-The global rbenv pin (`home/dot_ruby-version`) is `4.0.6`. Any project directory that doesn't
-have its own `.ruby-version` picks this up automatically, and `rails new` bakes whatever Ruby
-is currently active into the new app's own `.ruby-version` — so this alone is enough for new
-apps to start on Ruby 4.0. **Existing** apps are unaffected, since each already has its own
-`.ruby-version` (mostly still `3.3.5`) which always takes precedence over the global default.
-
-PostgreSQL needed more than a version bump: `postgresql@17` and `postgresql@15` both default
-to port 5432, and `postgresql@15` is already running there serving several existing apps'
-databases. Making `postgresql@17` the default on 5432 would have broken those apps, so instead
-`postgresql@17` is moved to **port 5433** — both instances now run side by side, `@15` staying
-untouched on 5432 for existing apps. This is done automatically by
-`run_onchange_after_10-install-packages-darwin.sh.tmpl` (idempotent — safe to re-run) whenever
-the Brewfile changes, so a fresh machine ends up in the same state.
-
-Since a plain `rails new -d postgresql` generates a `config/database.yml` with no port set
-(defaulting to 5432 → `postgresql@15`), a new app needs to explicitly target 5433 to actually
-land on PostgreSQL 17. `home/dot_rails-templates/rails_new.rb` is a personal Rails app template
-(Devise, Tailwind, Solid Cable/Queue/Cache, CLAUDE.md, etc.) that does this — its first step
-injects `port: 5433` into `config/database.yml` before `after_bundle` runs `db:create`. Scaffold
-a new app with:
-
-```sh
-rails-new my_app_name
-```
-
-(the `rails-new` alias in `home/dot_aliases`, expands to
-`rails new -d postgresql -m ~/.rails-templates/rails_new.rb`).
-
-### Local dev server ports
-
-No framework coordinates its default port with any other, so running two dev servers at once
-can collide — Rails (Puma) and Next.js both default to **3000**. This table is a personal
-reference for what each stack actually uses, so a clash gets caught by reading this instead of
-by a "port already in use" error:
-
-| Framework/tool | Port | Notes |
+| Tool | Port | Notes |
 |---|---|---|
-| Rails (Puma) | 3000 | framework default, unchanged |
-| Next.js | 3001 | overridden — framework default is 3000, same as Rails |
-| Vite | 5173 | framework default, unchanged |
-| Django | 8000 | framework default, unchanged |
-| Flask | 5000 | framework default; macOS AirPlay Receiver often already holds 5000, falls back to 5001 |
-| Vue CLI / Webpack dev server | 8080 | framework default, unchanged |
-| Angular CLI | 4200 | framework default, unchanged |
-| PostgreSQL | 5432 (`@15`), 5433 (`@17`) | see "New apps default to Ruby 4.0 / PostgreSQL 17" above |
-| Redis | 6379 | framework default, unchanged |
+| Rails (Puma) | 3000 | default |
+| Next.js | 3001 | overridden (default 3000 clashes with Rails): `next dev -p 3001` |
+| Vite | 5173 | default |
+| Django | 8000 | default |
+| Flask | 5000 | default; AirPlay Receiver may hold it, falls back to 5001 |
+| Vue CLI / Webpack | 8080 | default |
+| Angular CLI | 4200 | default |
+| PostgreSQL | 5432 (`@15`), 5433 (`@17`) | |
+| Redis | 6379 | default |
 
-To apply an overridden port to a project, set it explicitly rather than relying on the
-framework default — e.g. for Next.js, `"dev": "next dev -p 3001"` in `package.json`, or
-`PORT=3001` in `.env.local`. This table records intent; it isn't chezmoi-managed, since the
-actual port is set per-project, not machine-wide.
-
-### Making a change
-
-- `chezmoi edit ~/.zshrc` opens the source file in `$EDITOR`, then run `chezmoi apply` to
-  write it back to `~/.zshrc`.
-- Or `chezmoi cd` to jump straight into the source directory and edit/commit/push with
-  git as usual, then `chezmoi apply` on any machine to pick up the change.
-
-### Common commands
+## Commands
 
 | Command | What it does |
 |---|---|
-| `chezmoi diff` | Preview what would change before touching anything |
-| `chezmoi apply` | Write the source state to the target files in `$HOME` |
-| `chezmoi update` | `git pull` the source repo and apply, in one step |
-| `chezmoi status` | Show which managed files differ from source |
-| `chezmoi re-add` | Pull local drift (edits made directly on a target) back into the source |
-| `chezmoi unmanaged <path>...` | List untracked files under the given path(s) |
-| `chezmoi source-path` | Print where the source directory lives locally |
-| `bin/sync-dotfiles.sh` | Report drift (default), pull named files (`<path>...`) or all genuine drift (`--all`) into source, and report new unmanaged skill/hook files |
+| `chezmoi edit <file>` / `chezmoi cd` | edit the source, then `chezmoi apply` |
+| `chezmoi diff` | preview changes |
+| `chezmoi apply` | write source to `$HOME` |
+| `chezmoi update` | `git pull` and apply |
+| `chezmoi status` | managed files that differ from source |
+| `chezmoi unmanaged <path>…` | untracked files under a path (never run without a path) |
+| `bin/sync-dotfiles.sh [<path>… \| --all]` | report or pull local drift |
+
+## Fork notes
+
+Personal fork of [`lewagon/dotfiles`](https://github.com/lewagon/dotfiles); `origin` is
+`Y-O-W/dotfiles`, `upstream` is the Le Wagon repo.
+
+- Up to date with `upstream/master` as of 2026-09-28 (last upstream commit 2025-12-02).
+- Moved from a hand-rolled `install.sh` to chezmoi on 2026-07-14. The old install scripts and
+  loose root-level config files are retired.
+- Now covers the whole dev environment: Homebrew, rbenv/Ruby, VS Code, SSH, and Claude Code
+  config, skills and hooks.
+- Chezmoi gotchas: a bare `run_` prefix in the source tree is treated as a script (use
+  `literal_`), and zero-byte files are dropped unless prefixed `empty_`.
+- The locally modified `skill-creator` was retired in favour of `skill-creator-plus`; it remains
+  in git history.
