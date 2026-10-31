@@ -64,5 +64,6 @@
       }
     ],
     "extensions.ignoreRecommendations": true,
-    "python.analysis.typeCheckingMode": "standard"
+    "python.analysis.typeCheckingMode": "standard",
+    "git-blame.config.showBlameInline": true
 }

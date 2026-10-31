@@ -15,6 +15,9 @@ run this soon after creating or uploading a skill.
 What counts as a "home": a skill folder that the dotfiles manager (chezmoi) tracks
 in a git repository, with its changes committed and pushed. A folder that is merely
 tracked but has uncommitted or unpushed changes is reported as not yet backed up.
+A chezmoi external (a skill cloned from its own repo, e.g. pinned to a release tag)
+also has a home: its repo. It counts as backed up when the clone is clean and the
+commit it's checked out at exists on its remote, as a branch or a tag.
 
 What it checks
   1. Every user skill registered on the account (Desktop manifest, creatorType
@@ -62,6 +65,33 @@ def managed_skill_dirs():
     return names
 
 
+def external_skill_dirs():
+    """Names of skill folders in ~/.claude/skills that are chezmoi externals."""
+    code, out = run("chezmoi", "managed", "--include=externals", "--path-style=absolute")
+    if code != 0:
+        return set()
+    root = str(CODE_SKILLS) + "/"
+    return {line[len(root):].split("/")[0] for line in out.splitlines() if line.startswith(root)}
+
+
+def external_state(name):
+    """'ok' | 'uncommitted' | 'unpushed', for a skill cloned as a chezmoi external.
+    Its home is its own repo: the clone must be clean, and the commit it's checked
+    out at must exist on the remote (ls-remote lists branch heads and peeled tags)."""
+    folder = str(CODE_SKILLS / name)
+    _, dirty = run("git", "status", "--porcelain", cwd=folder)
+    if dirty:
+        return "uncommitted"  # edited in place: the change lives nowhere else
+    _, head = run("git", "rev-parse", "HEAD", cwd=folder)
+    code, remote = run("git", "ls-remote", "origin", cwd=folder)
+    return "ok" if code == 0 and head and head in remote else "unpushed"
+
+
+EXTERNAL_NOTES = {"ok": "external, pinned, clean (home: its own repo)",
+                  "uncommitted": "external with local edits: commit them in its repo, or re-apply",
+                  "unpushed": "external checked out at a commit its remote doesn't have"}
+
+
 def backup_state(name):
     """'ok' | 'drift' | 'new-files' | 'uncommitted' | 'unpushed' | 'no-repo', for a
     skill chezmoi tracks. Live-folder problems come first: if the folder Claude Code
@@ -103,6 +133,7 @@ def main():
     if tracked is None:
         print("chezmoi is not available (or failed), so tracked skills can't be determined.")
         return 2
+    externals = external_skill_dirs()
 
     problems = 0
     account_user = {}  # name -> Desktop bundle that has its folder
@@ -114,7 +145,11 @@ def main():
     print("Skills registered on the account by you (creatorType: user):")
     for name in sorted(account_user):
         on_disk = (CODE_SKILLS / name / "SKILL.md").exists()
-        if name in tracked:
+        if name in externals:
+            state = external_state(name)
+            problems += state != "ok"
+            print(f"  {'✅' if state == 'ok' else '⚠️ '} {name}: {EXTERNAL_NOTES[state]}")
+        elif name in tracked:
             state = backup_state(name)
             note = {"ok": "backed up (tracked, committed, pushed)",
                     "drift": "live folder has changes NOT yet pulled into the repo: "
@@ -151,7 +186,11 @@ def main():
     if not local_only:
         print("  none")
     for name in local_only:
-        if name in tracked:
+        if name in externals:
+            state = external_state(name)
+            problems += state != "ok"
+            print(f"  {'✅' if state == 'ok' else '⚠️ '} {name}: {EXTERNAL_NOTES[state]}")
+        elif name in tracked:
             state = backup_state(name)
             mark = "✅" if state == "ok" else "⚠️ "
             problems += state != "ok"

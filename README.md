@@ -63,7 +63,8 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 | `private_dot_claude/` | `~/.claude/` settings, hook, and custom skills |
 | `private_Library/…/Code/User/settings.json` | VS Code settings |
 | `dot_rails-templates/rails_new.rb` | Rails template used by the `rails-new` alias |
-| `.chezmoiscripts/` | oh-my-zsh (once), `brew bundle` and Ruby (on change) |
+| `.chezmoiscripts/` | oh-my-zsh (once), `brew bundle`, Ruby and brand-tokens gems (on change) |
+| `.chezmoiexternal.toml` | Externals: the `brand-tokens` skill, cloned at a pinned tag |
 
 Outside `home/` and not managed: `bin/`, `vendor/`, `README.md`, `LICENSE`.
 Untracked on purpose: `~/.claude/skills/synced/`, `~/.claude/plugins/synced/` (Claude's own caches),
@@ -75,7 +76,15 @@ and runtime state in `~/.claude/` (`projects/`, `cache/`, `history.jsonl`, …).
 Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.
 Claude Desktop uploads and the `synced/` cache are derived copies, not backups. Vendored
 third-party skills (`kepano/obsidian-skills`) have their provenance pinned in
-`vendor/kepano-obsidian-skills/UPSTREAM.md`. To find skills that exist only on the Claude account:
+`vendor/kepano-obsidian-skills/UPSTREAM.md`.
+
+One exception: **`brand-tokens` is an external, not a tracked copy.** `home/.chezmoiexternal.toml`
+clones `github.com/Y-O-W/brand` into `~/.claude/skills/brand-tokens`, pinned to a release tag;
+that repo is its home. Don't `chezmoi add` it or edit it in place. To upgrade, change the tag (twice)
+in `.chezmoiexternal.toml` and run `chezmoi apply --refresh-externals`; the
+`run_onchange_after_30-brand-tokens-gems.sh` script then installs the skill's gems.
+
+To find skills that exist only on the Claude account:
 
 ```sh
 cd ~/.claude/skills/skill-creator-plus

@@ -1,0 +1,13 @@
+# External repos chezmoi clones into place. Not tracked file by file: the
+# source of truth is the external repo at the pinned ref.
+
+# brand-tokens skill (github.com/Y-O-W/brand), pinned to a release tag.
+# git-repo externals can't pin a ref themselves, so the tag is in both args:
+# clone checks it out, and a refresh fast-forwards the detached HEAD to it.
+# To upgrade: change both tags, then `chezmoi apply --refresh-externals`.
+# Pins only move forward (--ff-only); to go back, delete the folder and apply.
+[".claude/skills/brand-tokens"]
+    type = "git-repo"
+    url = "git@github.com:Y-O-W/brand.git"
+    clone.args = ["--branch", "v0.2.0"]
+    pull.args = ["--ff-only", "origin", "v0.2.0"]
