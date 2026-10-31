@@ -1,0 +1,14 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+set -euo pipefail
+
+# Externals hash (reruns when the brand-tokens pin changes): {{ include ".chezmoiexternal.toml" | sha256sum }}
+# The skill's scripts load gems through its own Gemfile (json_schemer).
+skill="$HOME/.claude/skills/brand-tokens"
+[ -f "$skill/Gemfile" ] || exit 0
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
+eval "$(rbenv init - --no-rehash bash)"
+BUNDLE_GEMFILE="$skill/Gemfile" bundle check >/dev/null 2>&1 ||
+  BUNDLE_GEMFILE="$skill/Gemfile" bundle install --quiet
+{{ end -}}
