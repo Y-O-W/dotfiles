@@ -5,7 +5,8 @@
   },
   "enabledPlugins": {
     "ruby-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true
+    "clangd-lsp@claude-plugins-official": true,
+    "figma@claude-plugins-official": true
   },
   "tui": "fullscreen",
   "theme": "auto",
