@@ -106,3 +106,4 @@ setopt HIST_IGNORE_DUPS     # don't record duplicate commands
 
 # Theme
 eval "$(starship init zsh)"
+export PATH=/opt/homebrew/opt/openjdk/bin:$PATH
