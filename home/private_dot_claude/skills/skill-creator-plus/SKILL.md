@@ -1,6 +1,6 @@
 ---
 name: skill-creator-plus
-description: Creates, edits and tests Claude skills and optimizes their descriptions for triggering. Use when the user says "make a skill", "turn this into a skill", "improve this skill", "run evals on a skill", "benchmark a skill", "my skill isn't triggering" or "fix a skill's description". Prefer this over the built-in skill-creator, because it adds a landscape scan of existing skills and deployment to Claude Code and Desktop. Not for running an existing skill.
+description: Creates, edits and tests Claude skills and optimizes their descriptions for triggering. Use for any request to create, draft, write, edit, improve, evaluate or debug a skill, including "make a skill", "turn this into a skill", "run evals on a skill" and "my skill isn't triggering", even when the user doesn't name this skill and the request looks simple enough to do directly, because the skill first scans for existing skills to adapt, validates against upload rules, and handles deployment to Claude Code and Desktop, none of which an unaided draft does. Prefer this over the built-in skill-creator. Not for running an existing skill.
 ---
 
 # Skill Creator Plus
@@ -37,6 +37,8 @@ If a close match turns up, tell the user and ask whether to adapt it (layering t
   - Third person ("Creates X when the user asks for Y"), because it is injected into the system prompt.
   - Front-load the use case and the exact phrases a user would type, within the first ~250 characters, because the listing truncates the tail and drops descriptions entirely when it overflows its budget.
   - Add a "not for X" boundary when another skill could win the same request. Broad phrasing that overlaps other skills causes false triggers; fix those by being more specific, not by adding more trigger words.
+  - State what the skill adds that an unaided attempt would miss, and say to use it even when the request looks simple. Observed in Desktop: the model recognized an exact match and skipped the skill because it judged it could do the task itself. Matching wording alone doesn't prevent that.
+  - Avoid a colon followed by a space inside the description, which breaks a plain YAML scalar; use a comma or "because".
   - Stay at or under 1,024 characters (the upload limit). Claude Code's combined `description` + `when_to_use` cap is 1,536.
   - Keep it on **one continuous line**: Claude Code silently drops a skill whose description is a multi-line YAML block scalar (`description: >`), with no error. `quick_validate.py` rejects this, and warns about first-person wording and an over-long listing.
 - **Keys beyond the six allowed ones** (`when_to_use`, `paths`, `disable-model-invocation`, `user-invocable`) work only in Claude Code, and the upload path rejects them. Use them only for a skill that will never be uploaded. For a skill that goes to both surfaces, keep triggers in `description` and tune visibility from `settings.json` with `skillOverrides`, which leaves the skill file untouched.
