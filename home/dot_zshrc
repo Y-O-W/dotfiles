@@ -98,7 +98,7 @@ unset _gh_user_cache
 path=("$HOME/.venv/bin" "$HOME/.local/bin" $path)
 
 # Alias
-alias rsync="git pull && bundle install && yarn install && rails db:migrate && rails restart"
+alias railssync="git pull && bundle install && yarn install && rails db:migrate && rails restart"
 
 alias render-cv='cd /Users/yowfactor/Developer/personal/Y-O-W.github.io && source .venv/bin/activate && python3 render_cv.py'
 

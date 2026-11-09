@@ -1,18 +1,8 @@
 {
-  "model": "sonnet",
   "permissions": {
     "defaultMode": "default"
   },
-  "enabledPlugins": {
-    "ruby-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true,
-    "figma@claude-plugins-official": true
-  },
-  "tui": "fullscreen",
-  "theme": "auto",
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
-  "outputStyle": "Learning",
+  "model": "sonnet",
   "hooks": {
     "PostToolUse": [
       {
@@ -44,5 +34,16 @@
         ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {
+    "ruby-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true,
+    "figma@claude-plugins-official": true,
+    "slack@claude-plugins-official": true
+  },
+  "outputStyle": "Learning",
+  "tui": "fullscreen",
+  "theme": "auto",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
