@@ -57,6 +57,28 @@ RESERVED_NAME_WORDS = {'claude', 'anthropic'}
 # Claude Code reserves this folder name for skills synced from claude.ai.
 RESERVED_NAME = 'synced'
 
+# Keys only Claude Code understands. The upload path (claude.ai and the API)
+# rejects them, so they are allowed only for a skill marked Claude Code only,
+# and never when packaging for upload.
+CODE_ONLY_PROPERTIES = {
+    'when_to_use', 'disable-model-invocation', 'user-invocable', 'paths',
+    'context', 'model', 'effort', 'hooks',
+}
+# How a skill is marked Claude Code only: its top-level `compatibility` field
+# (an allowed key meant for environment requirements) starts with this phrase.
+# Top-level on purpose, so the PyYAML-free fallback parser can read it.
+CODE_ONLY_MARKER = 'claude code only'
+
+
+def is_code_only(frontmatter):
+    """True if the skill declares itself Claude Code only via `compatibility`."""
+    compatibility = frontmatter.get('compatibility', '')
+    return (
+        isinstance(compatibility, str)
+        and compatibility.strip().lower().startswith(CODE_ONLY_MARKER)
+    )
+
+
 # Claude Code truncates description + when_to_use at this many characters in
 # its skill listing, and Anthropic recommends a SKILL.md body under 500 lines.
 LISTING_CAP = 1536
@@ -112,8 +134,12 @@ def _counts_as_skill_md(rel_path):
     return True
 
 
-def validate_skill(skill_path):
-    """Basic validation of a skill"""
+def validate_skill(skill_path, for_upload=False):
+    """Basic validation of a skill.
+
+    A skill marked Claude Code only (see is_code_only) may use CODE_ONLY_PROPERTIES.
+    With for_upload=True (package_skill) it is rejected instead, because the
+    upload path rejects those keys and the skill is not meant for Desktop."""
     skill_path = Path(skill_path)
 
     # Check SKILL.md exists
@@ -182,17 +208,34 @@ def validate_skill(skill_path):
     # Define allowed properties
     ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'}
 
+    code_only = is_code_only(frontmatter)
+    if code_only and for_upload:
+        return False, (
+            "This skill is marked Claude Code only (`compatibility`), so it is not "
+            "meant for upload to claude.ai or the API, and its Code-only keys would "
+            "be rejected there. Install it as a folder (chezmoi / ~/.claude/skills/) "
+            "instead of packaging it, or remove the marker and the Code-only keys."
+        )
+    allowed = ALLOWED_PROPERTIES | (CODE_ONLY_PROPERTIES if code_only else set())
+
     # Check for unexpected properties (excluding nested keys under metadata)
-    unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
+    unexpected_keys = set(frontmatter.keys()) - allowed
     if unexpected_keys:
         hint = ""
         if 'version' in unexpected_keys:
             # `version:` is a common habit but is not in the allowed set; `metadata`
             # takes arbitrary string keys, so the value can be kept there instead.
             hint = " To keep a version, nest it: `metadata:` then an indented `version: \"1.0\"`."
+        code_only_used = sorted(unexpected_keys & CODE_ONLY_PROPERTIES)
+        if code_only_used:
+            hint += (
+                f" {', '.join(code_only_used)} work only in Claude Code. If this skill "
+                "will never be uploaded, mark it with `compatibility: Claude Code only, ...`; "
+                "otherwise remove the key."
+            )
         return False, (
             f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}. "
-            f"Allowed properties are: {', '.join(sorted(ALLOWED_PROPERTIES))}.{hint}"
+            f"Allowed properties are: {', '.join(sorted(allowed))}.{hint}"
         )
 
     # Check required fields

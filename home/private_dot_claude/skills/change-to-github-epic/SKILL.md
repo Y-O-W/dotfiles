@@ -2,6 +2,7 @@
 name: change-to-github-epic
 description: Turns a finished plan into a GitHub Epic with parent-linked sub-issues, blocked-by dependencies and a wave roadmap. Use at the planning-to-build handoff, even when the plan looks small, after /opsx:propose and before /opsx:apply, after /speckit.tasks and before /speckit.implement, or after a Claude Code plan is approved and before any code is written. Also for "create an epic", "break this into GitHub issues", "roadmap this change", "turn this plan into issues". Claude Code only. Not for writing code.
 when_to_use: Fire at the moment planning ends and building would start. Triggers are OpenSpec propose finished (/opsx:propose, /opsx:ff, /opsx:continue reaching apply-ready), SpecKit tasks finished (/speckit.tasks or /speckit.analyze done, tasks.md exists), and a Claude Code plan session approved via plan mode. Also "who should work on this", "what order should we build this in", "file these as issues", "set up the board for this change".
+compatibility: Claude Code only, needs git, gh and a local project checkout
 metadata:
   version: 1.2.0
 ---

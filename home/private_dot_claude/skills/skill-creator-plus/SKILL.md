@@ -41,7 +41,7 @@ If a close match turns up, tell the user and ask whether to adapt it (layering t
   - Avoid a colon followed by a space inside the description, which breaks a plain YAML scalar; use a comma or "because".
   - Stay at or under 1,024 characters (the upload limit). Claude Code's combined `description` + `when_to_use` cap is 1,536.
   - Keep it on **one continuous line**: Claude Code silently drops a skill whose description is a multi-line YAML block scalar (`description: >`), with no error. `quick_validate.py` rejects this, and warns about first-person wording and an over-long listing.
-- **Keys beyond the six allowed ones** (`when_to_use`, `paths`, `disable-model-invocation`, `user-invocable`) work only in Claude Code, and the upload path rejects them. Use them only for a skill that will never be uploaded. For a skill that goes to both surfaces, keep triggers in `description` and tune visibility from `settings.json` with `skillOverrides`, which leaves the skill file untouched.
+- **Keys beyond the six allowed ones** (`when_to_use`, `paths`, `disable-model-invocation`, `user-invocable`) work only in Claude Code, and the upload path rejects them. Use them only for a skill that will never be uploaded, and mark it by starting its top-level `compatibility` field with "Claude Code only" (for example `compatibility: Claude Code only, needs git and gh`). `quick_validate` then allows the Code-only keys, and `package_skill` refuses to package it for upload. For a skill that goes to both surfaces, keep triggers in `description` and tune visibility from `settings.json` with `skillOverrides`, which leaves the skill file untouched.
 - **compatibility**: required tools or dependencies (optional, rarely needed).
 - **body**: the instructions.
 
