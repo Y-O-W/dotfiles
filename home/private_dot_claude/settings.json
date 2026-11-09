@@ -23,6 +23,25 @@
             "command": "/Users/yowfactor/.claude/hooks/skill-usage-tracker.py"
           }
         ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/yowfactor/.claude/hooks/epic-handoff-nudge.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/yowfactor/.claude/hooks/epic-handoff-nudge.py"
+          }
+        ]
       }
     ]
   }

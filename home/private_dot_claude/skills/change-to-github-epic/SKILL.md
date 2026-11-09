@@ -1,7 +1,9 @@
 ---
 name: change-to-github-epic
-description: Use after /opsx:propose completes and before /opsx:apply, when an OpenSpec change proposal needs to be broken into a GitHub epic with linked issues, a dependency-ordered roadmap, and a developer resource mapping. Trigger phrases: "create an epic", "break this into GitHub issues", "roadmap this change", "who should work on this", "turn this proposal into issues".
-version: 1.1.0
+description: Turns a finished plan into a GitHub Epic with parent-linked sub-issues, blocked-by dependencies and a wave roadmap. Use at the planning-to-build handoff, even when the plan looks small, after /opsx:propose and before /opsx:apply, after /speckit.tasks and before /speckit.implement, or after a Claude Code plan is approved and before any code is written. Also for "create an epic", "break this into GitHub issues", "roadmap this change", "turn this plan into issues". Claude Code only. Not for writing code.
+when_to_use: Fire at the moment planning ends and building would start. Triggers are OpenSpec propose finished (/opsx:propose, /opsx:ff, /opsx:continue reaching apply-ready), SpecKit tasks finished (/speckit.tasks or /speckit.analyze done, tasks.md exists), and a Claude Code plan session approved via plan mode. Also "who should work on this", "what order should we build this in", "file these as issues", "set up the board for this change".
+metadata:
+  version: 1.2.0
 ---
 
 # Change → GitHub Epic
@@ -12,13 +14,35 @@ drafted for review, never created without explicit confirmation.
 
 ## When to use this skill
 
-Run this immediately after `/opsx:propose` has generated a change folder's
-artifacts, and before running `/opsx:apply`. This is planning work, not
-implementation — the goal is to translate an already-drafted change into
-something the team can plan a sprint around.
+Run this at the handoff between planning and building. This is planning
+work, not implementation — the goal is to translate an already-drafted
+plan into something the team can plan a sprint around. Three entry points:
 
-Do not run this on a change that hasn't been proposed yet, and do not run
-it as a substitute for `/opsx:apply` — this skill never writes code.
+| Source | Run after | Run before | Plan lives in |
+|---|---|---|---|
+| OpenSpec | `/opsx:propose` (or `/opsx:ff`, `/opsx:continue` once apply-ready) | `/opsx:apply` | `openspec/changes/<name>/` |
+| SpecKit | `/speckit.tasks` (ideally `/speckit.analyze` too) | `/speckit.implement` | `specs/<NNN-name>/` (`spec.md`, `plan.md`, `tasks.md`) |
+| Claude Code plan session | the plan is approved (plan mode exit) | the first edit | the approved plan (conversation, or the saved plan file) |
+
+**Be proactive.** When one of these workflows reaches its finish line,
+offer this skill before the next step starts, even if the user didn't ask
+and even if the change looks small. Skipping it at the handoff is the usual
+failure: the next command (`/opsx:apply`, `/speckit.implement`, or the first
+edit) starts the build with no issues to track it against. Offer once and
+accept a "no" — never block the next step.
+
+Do not run this on a plan that hasn't been finished, and do not run it as
+a substitute for `/opsx:apply`, `/speckit.implement` or any other
+implementation step — this skill never writes code.
+
+**Why the trigger is only best-effort.** A description can be recognized
+and still skipped, and the keys this skill can use (`when_to_use`) only
+improve matching. A skill's own `hooks:` run only after it has loaded, so
+they can't enforce loading. Hard enforcement belongs in a hook in
+`settings.json`, for example a `PostToolUse` hook on `ExitPlanMode` or a
+`UserPromptSubmit` hook matching `/opsx:apply` and `/speckit.implement`
+that reminds the model to run this skill first. Explicit `/change-to-github-epic`
+always works.
 
 **Claude Code only.** This skill runs `git`/`gh` via shell and reads the
 change folder directly from the local filesystem, so it needs real bash
@@ -32,22 +56,41 @@ Cowork workspace, which usually isn't the case.
 ## Resolving which change
 
 - If invoked with an argument naming a change (or given a path), use that
-  change directly.
-- Otherwise, list changes (e.g. `openspec list --json`) and find ones whose
-  planning artifacts are complete (apply-ready). If exactly one matches,
-  use it. If zero or more than one match, ask the user which change to use
-  before reading any artifact files — don't guess from conversation context
-  alone if it's ambiguous.
+  directly.
+- Otherwise detect the source. OpenSpec: list changes (e.g.
+  `openspec list --json`) and find ones whose planning artifacts are
+  complete (apply-ready). SpecKit: look for `specs/*/tasks.md` (and
+  `.specify/`). Plan session: use the plan just approved in this
+  conversation. If exactly one candidate matches, use it. If zero or more
+  than one match, ask the user which to use before reading any files —
+  don't guess from conversation context alone if it's ambiguous.
 
 ## Inputs
 
-Read, in this order, from the relevant change folder
-(`openspec/changes/<name>/`):
+Read, in this order, from the relevant source. The headings below map the
+three sources onto the same roles; the rest of the skill refers to the
+roles ("scope", "design", "tasks", "requirements").
+
+**OpenSpec** (`openspec/changes/<name>/`):
 
 1. `proposal.md` — scope, intent, what's in/out
 2. `design.md` — technical approach; the primary source for dependency detection
 3. `tasks.md` — the ordered task list; source material for individual issues
 4. `specs/` (delta specs) — cross-check that no requirement is missing an issue
+
+**SpecKit** (`specs/<NNN-name>/`):
+
+1. `spec.md` — scope, user stories, acceptance scenarios (the "what")
+2. `plan.md` (+ `research.md`, `data-model.md`, `contracts/`) — technical approach; the primary source for dependency detection
+3. `tasks.md` — the ordered task list with `[P]` parallel markers and phases; source material for issues (`[P]` tasks hint at same-wave work)
+4. `.specify/memory/constitution.md` — constraints every issue must respect; cross-check, don't copy
+
+**Claude Code plan session:** the approved plan is the only input. Treat
+its goal as scope, its steps as tasks, and its stated ordering as the
+dependency source. There are no spec files to cite, so each issue's
+reference back to the source is the plan file path if one was saved
+(otherwise a short plan excerpt in the issue body). Say in the draft that
+acceptance criteria were inferred from the plan, not from a spec.
 
 If a project-level `CLAUDE.md` or `AGENTS.md` contains a team/ownership
 section (developer names mapped to domains, e.g. "creators/ → Dev B"), read
@@ -74,7 +117,7 @@ The epic is the single top-level artifact — its body should contain the
 full picture, not just scope and intent. Compose it from the outputs of
 steps 2–5 below, structured as:
 
-- **Title:** the change name, in plain language (not the kebab-case folder name)
+- **Title:** must contain the word "Epic", in the form `Epic: <change name in plain language>` (not the kebab-case folder name). Sub-issues never use the word "Epic".
 - **Summary:** scope and intent from `proposal.md`, condensed to a few sentences
 - **Out of scope:** carried over from `proposal.md` if present
 - **Issue checklist:** every issue from step 2, as a linked checklist item
@@ -97,8 +140,21 @@ one task. Each issue should include:
 - A title derived from the task
 - Acceptance criteria pulled from the corresponding delta spec scenario,
   if one exists
-- A reference back to the OpenSpec change folder path, so reviewers can
-  trace the issue to its source spec
+- A reference back to the source (the OpenSpec change folder, the SpecKit
+  `specs/<NNN-name>/` folder, or the saved plan file), so reviewers can
+  trace the issue to where it came from
+- The task checklist for that issue, copied from `tasks.md` (or the plan
+  steps). Add one line under it: "Copied from `<path>` — the source file
+  stays the source of truth; this list can drift."
+
+**Every issue gets relationships**, set at creation, not left in prose:
+
+- **Parent** (always): the epic. The epic itself is the only issue without one.
+- **Blocked by / blocking** (when a dependency from step 3 exists).
+- **Relates to** (when applicable): issues in the same domain that share
+  files or context but have no technical ordering. GitHub has no native
+  "relates to" link, so write `Related: #n` in the issue body, which
+  creates a cross-reference both ways.
 
 ### 3. Identify dependencies
 
@@ -159,10 +215,13 @@ there is no separate top-level roadmap or resource section:
 **Out of scope:** ...
 
 ### Issues
-- [ ] #1 <title> — depends on: none
+- [ ] #1 <title> — parent: epic — blocked by: none — relates to: none
       Acceptance criteria: ...
-- [ ] #2 <title> — depends on: #1
+- [ ] #2 <title> — parent: epic — blocked by: #1 — relates to: #3
       Acceptance criteria: ...
+
+### Project automation
+Enabled workflows: ... Disabled: ... (what happens automatically vs by hand)
 
 ### Roadmap
 **Wave 1 (parallel)**
@@ -191,9 +250,38 @@ relationship features rather than tracking structure only in prose:
 
 **Creation order matters.** The epic has no parent and must be created
 first. Each sub-issue can then set `--parent` to the epic's number.
-Walk the wave order from step 4 — an issue with `--blocked-by` deps must
-be created after the issues it depends on, so their numbers already
-exist to reference.
+Walk the wave order from step 4 — GitHub rejects a dependency on an issue
+that doesn't exist yet, so an issue with `--blocked-by` deps must be
+created after the issues it depends on. The order is derived from the
+dependency map, not chosen: if D depends on C, C is created first, and an
+issue that depends on everything is created last. Wave order alone is not
+enough when two issues in the same wave depend on each other.
+
+**What the project workflows do versus what this skill does.** Project
+workflows (the board's Workflows tab) are enabled per project, and the
+template project has them on. Check which are enabled for the target
+project before creating anything, because it decides what the skill must
+do by hand:
+
+```
+gh api graphql -f query='query($o:String!,$n:Int!){user(login:$o){projectV2(number:$n){workflows(first:30){nodes{name enabled}}}}}' -f o=<owner> -F n=<project-number>
+```
+
+(Use `organization(login:$o)` instead of `user` for an org-owned project.)
+
+| Workflow (template defaults) | Effect | Skill's job |
+|---|---|---|
+| Auto-add sub-issues to project | sub-issues of an epic already on the board join it | add only the epic with `-p`; verify the children arrived |
+| Auto-add to project | new repo issues matching a filter join | nothing, if enabled |
+| Item added to project | sets Status (usually Backlog) | do not set Status; read it back |
+| Item closed / reopened, Auto-close issue, Auto-archive items | status follows issue state | nothing |
+| Pull request linked to issue / merged, Code changes requested | status follows PR state | nothing |
+
+If a workflow is disabled, do its job by hand, and only for fields with an
+obvious default (add each issue with `-p`; Status only if the project
+defaults to none). Put the enabled/disabled list in the draft so the user
+sees what will and won't happen automatically. Never set Priority, Effort
+or due dates either way.
 
 **The epic body has a chicken-and-egg problem.** It can't link real issue
 numbers until the sub-issues exist, but the sub-issues want `--parent`
@@ -220,14 +308,37 @@ After creating the epic and all issues, confirm the sequence actually
 completed rather than assuming it did — an interrupted or partially
 failed run should never be reported as a clean success:
 
-- Confirm every planned issue was created. `gh issue view <epic-number>
-  --json subIssuesSummary` should report a total matching the planned
-  issue count.
-- Spot-check that dependency links landed as intended, especially on the
-  issues with the most dependencies.
-- Report the epic URL and each issue's URL/number back to the user; if
-  anything failed to create or link, say so explicitly rather than
-  omitting it from the summary.
+Run these checks, read back through the API rather than assumed from the
+create calls, and report each as pass or fail with the numbers:
+
+- **Parent links:** every child lists the epic as its parent (native
+  sub-issue link). `gh issue view <epic-number> --json subIssuesSummary`
+  must report a total equal to the planned issue count, so GitHub shows
+  the progress itself.
+- **Dependencies:** the blocked-by links match the plan exactly, in both
+  directions, for every issue, not just a spot-check.
+- **Coverage:** every task from `tasks.md` (or plan step) appears in
+  exactly one issue. State the count per issue and the total, e.g.
+  `6+3+4 = 13 of 13 tasks`. Zero or two appearances is a failure.
+- **Assignee:** each issue is assigned as drafted. If the draft left
+  owners unset, they must be unset.
+- **Status and fields:** the board item for each issue (epic and children)
+  has the Status the project workflows were expected to give it, and
+  Priority, Effort and due dates are untouched. Report what the workflows
+  actually did.
+- **Title:** the epic's title contains "Epic".
+
+Report the epic URL and each issue's URL/number back to the user; if
+anything failed to create or link, say so explicitly rather than
+omitting it from the summary, and never report a partial run as success.
+
+## Assignees
+
+If the ownership section from Inputs exists, use it. If it doesn't and the
+target repo is a personal repo owned by the authenticated user (`gh api
+user --jq .login` equals the repo owner), propose assigning every issue to
+that user in the draft, and mark it as a proposal for confirmation. For a
+shared or org repo with no ownership source, leave issues unassigned.
 
 ## Explicit boundaries
 
@@ -240,5 +351,9 @@ failed run should never be reported as a clean success:
 - Never guess which repository or which GitHub Project to file into —
   resolve explicitly (see "Determining the target repo and project") or
   ask.
-- Never use this skill to skip or replace `/opsx:apply` — it produces
+- Never use this skill to skip or replace `/opsx:apply`,
+  `/speckit.implement` or the build of an approved plan — it produces
   planning artifacts for the team, not code.
+- The change files (or plan) stay the source of truth. The checklists in
+  the issues are copies and can drift; when they disagree, the source wins.
+  Issue checkboxes tick as the work is done.
