@@ -1,6 +1,6 @@
 ---
 name: skill-creator-plus
-description: Create new skills, modify and improve existing skills, and measure skill performance — with a landscape-scan step that checks for existing proven skills (anthropics/skills, community directories) before drafting from scratch. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.
+description: Creates, edits and tests Claude skills and optimizes their descriptions for triggering. Use when the user says "make a skill", "turn this into a skill", "improve this skill", "run evals on a skill", "benchmark a skill", "my skill isn't triggering" or "fix a skill's description". Prefer this over the built-in skill-creator, because it adds a landscape scan of existing skills and deployment to Claude Code and Desktop. Not for running an existing skill.
 ---
 
 # Skill Creator Plus
@@ -32,8 +32,14 @@ If a close match turns up, tell the user and ask whether to adapt it (layering t
 
 ### Write the SKILL.md
 
-- **name**: skill identifier.
-- **description**: the primary trigger mechanism. Say what the skill does AND when to use it; all "when" info goes here, not the body. Claude undertriggers, so be a little pushy (e.g. append "Use whenever the user mentions dashboards, metrics, or company data, even if they don't say 'dashboard'"). Keep it on **one continuous line**: Claude Code silently drops a skill whose description is a multi-line YAML block scalar (`description: >`), with no error. `scripts/quick_validate.py` rejects this.
+- **name**: at most 64 characters, lowercase letters, digits and hyphens, equal to the folder name. No "claude" or "anthropic", and never `synced`. `scripts/quick_validate.py` checks all of this.
+- **description**: the primary trigger mechanism. Say what the skill does AND when to use it; all "when" info goes here, not the body. Write it so it routes well in a crowded listing:
+  - Third person ("Creates X when the user asks for Y"), because it is injected into the system prompt.
+  - Front-load the use case and the exact phrases a user would type, within the first ~250 characters, because the listing truncates the tail and drops descriptions entirely when it overflows its budget.
+  - Add a "not for X" boundary when another skill could win the same request. Broad phrasing that overlaps other skills causes false triggers; fix those by being more specific, not by adding more trigger words.
+  - Stay at or under 1,024 characters (the upload limit). Claude Code's combined `description` + `when_to_use` cap is 1,536.
+  - Keep it on **one continuous line**: Claude Code silently drops a skill whose description is a multi-line YAML block scalar (`description: >`), with no error. `quick_validate.py` rejects this, and warns about first-person wording and an over-long listing.
+- **Keys beyond the six allowed ones** (`when_to_use`, `paths`, `disable-model-invocation`, `user-invocable`) work only in Claude Code, and the upload path rejects them. Use them only for a skill that will never be uploaded. For a skill that goes to both surfaces, keep triggers in `description` and tune visibility from `settings.json` with `skillOverrides`, which leaves the skill file untouched.
 - **compatibility**: required tools or dependencies (optional, rarely needed).
 - **body**: the instructions.
 
@@ -45,7 +51,7 @@ skill-name/
 └── assets/      files used in output (templates, icons, fonts)
 ```
 
-**Progressive disclosure:** metadata is always in context; the SKILL.md body loads whenever the skill triggers, so keep it under 500 lines and split the rest into `references/` with pointers saying when to read each; bundled resources load as needed (scripts can run without loading). Give reference files over 300 lines a table of contents. For multi-domain skills, keep the workflow and selection logic in SKILL.md and one reference per variant (`aws.md`, `gcp.md`), so Claude reads only the relevant one.
+**Progressive disclosure:** metadata is always in context; the SKILL.md body loads whenever the skill triggers, so keep it under 500 lines and split the rest into `references/` with pointers saying when to read each; bundled resources load as needed (scripts can run without loading). Keep references one level deep from SKILL.md (a file that only points to another file may be read partially), and give reference files over 100 lines a table of contents. For multi-domain skills, keep the workflow and selection logic in SKILL.md and one reference per variant (`aws.md`, `gcp.md`), so Claude reads only the relevant one.
 
 **Safety:** no malware, exploit code, misleading skills, or anything for unauthorized access or data exfiltration. A skill's behavior shouldn't surprise the user given its description. Roleplay skills are fine.
 
@@ -53,7 +59,7 @@ skill-name/
 
 ### Test cases
 
-Write 2-3 realistic prompts, the kind a real user would type. Show them ("Do these look right, or do you want to add more?"), then run them. Save to `evals/evals.json` with prompts only; assertions come later while runs are in progress. Full schema in `references/schemas.md`.
+Write at least three realistic prompts, the kind a real user would type, including at least one the skill must *not* handle. Show them ("Do these look right, or do you want to add more?"), then run them. Save to `evals/evals.json` with prompts only; assertions come later while runs are in progress. Full schema in `references/schemas.md`.
 
 ```json
 {"skill_name": "example-skill", "evals": [{"id": 1, "prompt": "User's task prompt", "expected_output": "Description of expected result", "files": []}]}
@@ -173,15 +179,26 @@ Use the model ID from your system prompt so the test matches what the user exper
 
 Put `best_description` into the frontmatter (still one line), show the user before/after, and report the scores.
 
+### When a skill isn't triggering
+
+Work through these in order before rewriting anything; each step is cheap.
+
+1. **Check that the description is in context.** Claude Code lists every skill by name, but when the listing exceeds its budget (1% of the context window) it drops descriptions, least-invoked skills first, and a name alone can't be matched. Run `/context` (the Skills row) and `/skill-doctor` (per-skill cost and uses), or ask "What skills are available?" and see whether the skill appears with a description. `/doctor` summarizes the listing's cost, and `claude --debug` logs a warning on overflow.
+2. **Relieve the budget if it's full.** Turn off unused plugins with `/plugin` (`skillOverrides` does not affect plugin skills), set rarely used skills to `"name-only"` or `"off"` in `skillOverrides`, or raise `skillListingBudgetFraction`. Account copies of skills also appear a second time under the `anthropic-skills:` prefix, which doubles their cost.
+3. **Check the description,** per "Write the SKILL.md": front-loaded trigger phrases, third person, a boundary against competing skills (the built-in `skill-creator` competes with this one).
+4. **Check the frontmatter parses.** A broken frontmatter loads the skill with empty metadata: `/skill-name` still works but nothing matches. `quick_validate` catches this, and `claude --debug` shows the parse error.
+5. **Fall back to explicit invocation.** `/skill-name` always works for a user-invocable skill. For a rule that must always hold, a hook is more reliable than a skill.
+6. **Measure with a realistic listing.** Description optimization (below) tests a description against a query set. It may not reproduce a crowded listing, so confirm in a normal session after applying a result. For skills shipped in a plugin, `claude plugin eval` with a `tool_used: Skill` grader measures whether the skill fires.
+
 ## Deploying a finished skill locally
 
 A finished skill must be visible wherever the user works. Claude Code reads `~/.claude/skills/<name>/`. Desktop's Chat and Cowork load only skills registered on the account, and uploading is the only way to register one; a folder copied into Desktop's app directory is deleted at its next sync. If `~/.claude/skills` is dotfiles-managed (chezmoi etc.), copying into it isn't the last step either. Evidence and per-surface procedures: `references/deployment-locations.md`.
 
 Run these in order after any pass that changed files (skip what doesn't apply and say which; this assumes local Claude Code with chezmoi):
 
-1. **Validate:** `python -m scripts.quick_validate <skill-folder>`; delete any `__pycache__` your runs created.
+1. **Validate:** `python -m scripts.quick_validate <skill-folder>`; fix every error and read every warning (they cover triggering and size and don't change the exit code). Delete any `__pycache__` your runs created.
 2. **Pull into the dotfiles source:** the dotfiles repo's `bin/sync-dotfiles.sh <changed paths>` (see the dotfiles section of `references/deployment-locations.md`) for files chezmoi already tracks, and `chezmoi add <path>` for any file you *created*, since the sync script only reports new files and one left out would reach Desktop but never git. Don't commit; that's the user's call.
-3. **Package and reveal:** `python -m scripts.package_skill <skill-folder> ~/Downloads/upload --zip`, then `open -R` the zip (`--all <skills-dir>` packages several). With a file-delivery tool (`present_files`, `SendUserFile`), run it without `--zip` and send the `.skill` instead; its **Save skill** button installs it when the org allows.
+3. **Package and reveal:** `python -m scripts.package_skill <skill-folder> ~/Downloads/upload-<date> --zip` (use a fresh output folder each time, since old zips linger and the wrong one is easy to upload), then `open -R` the zip (`--all <skills-dir>` packages several). With a file-delivery tool (`present_files`, `SendUserFile`), run it without `--zip` and send the `.skill` instead; its **Save skill** button installs it when the org allows.
 4. **Hand off:** tell the user to commit and push the dotfiles repo and to upload the zip (Customize → Skills → + → Create skill → Upload a skill, accepting the replace prompt). You can do neither; say so rather than implying the skill is installed.
 5. **Verify after they confirm:** `python -m scripts.verify_desktop_registration <skill-name> ...` (read-only: registered in Desktop's manifest? reached the synced mirror? duplicated as account plus personal copy?) and `python -m scripts.check_skill_backup` (flags skills with no pushed git home; `--harvest` copies an account-only skill out of Desktop's cache). Never edit Desktop's manifest or its neighboring folders.
 
