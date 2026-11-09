@@ -9,7 +9,7 @@ Usage:
 Example:
     python -m scripts.package_skill skills/public/my-skill
     python -m scripts.package_skill skills/public/my-skill ./dist
-    python -m scripts.package_skill --all .claude/skills ~/Downloads/upload --zip
+    python -m scripts.package_skill --all .claude/skills ~/Downloads/upload-<date> --zip
 
 Both extensions are the same zip archive. `.skill` is what a file-delivery tool's
 "Save skill" card expects; `--zip` writes `<name>.zip`, the extension Claude
@@ -160,7 +160,7 @@ def main():
         print("\nExample:")
         print("  python -m scripts.package_skill skills/public/my-skill")
         print("  python -m scripts.package_skill skills/public/my-skill ./dist")
-        print("  python -m scripts.package_skill --all .claude/skills ~/Downloads/upload --zip")
+        print("  python -m scripts.package_skill --all .claude/skills ~/Downloads/upload-<date> --zip")
         sys.exit(1)
 
     target = args[0]

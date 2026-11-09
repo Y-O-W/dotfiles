@@ -52,6 +52,55 @@ def _description_spans_lines(frontmatter_text):
 EXCLUDED_DIR_PARTS = {'__pycache__', 'node_modules'}
 ROOT_EXCLUDED_DIR_PARTS = {'evals'}
 
+# Upload (claude.ai and the API) rejects these words in a skill name.
+RESERVED_NAME_WORDS = {'claude', 'anthropic'}
+# Claude Code reserves this folder name for skills synced from claude.ai.
+RESERVED_NAME = 'synced'
+
+# Claude Code truncates description + when_to_use at this many characters in
+# its skill listing, and Anthropic recommends a SKILL.md body under 500 lines.
+LISTING_CAP = 1536
+MAX_BODY_LINES = 500
+
+
+def collect_warnings(skill_path):
+    """Non-fatal findings about triggering and size, for a skill that is valid.
+    Returned as strings; validate_skill's pass/fail result is unchanged."""
+    skill_path = Path(skill_path)
+    warnings = []
+    content = (skill_path / 'SKILL.md').read_text()
+    match = re.match(r'^---\n(.*?)\n---\n?(.*)$', content, re.DOTALL)
+    if not match:
+        return warnings
+    fm_text, body = match.group(1), match.group(2)
+    if yaml is not None:
+        try:
+            fm = yaml.safe_load(fm_text) or {}
+        except yaml.YAMLError:
+            fm = {}
+    else:
+        fm = _parse_frontmatter_fallback(fm_text)
+    listing = len(str(fm.get('description', ''))) + len(str(fm.get('when_to_use', '')))
+    if listing > LISTING_CAP:
+        warnings.append(
+            f"description + when_to_use is {listing} characters; Claude Code truncates "
+            f"the listing at {LISTING_CAP}, so put the trigger phrases first."
+        )
+    body_lines = len(body.splitlines())
+    if body_lines > MAX_BODY_LINES:
+        warnings.append(
+            f"SKILL.md body is {body_lines} lines; Anthropic recommends under "
+            f"{MAX_BODY_LINES}. Move detail into references/ files."
+        )
+    description = str(fm.get('description', ''))
+    if re.match(r'^(I|You|We)\b', description.strip()):
+        warnings.append(
+            "The description starts in first or second person; write it in third "
+            "person (\"Creates X when the user asks for Y\"), since it is injected "
+            "into the system prompt."
+        )
+    return warnings
+
 
 def _counts_as_skill_md(rel_path):
     """True if a SKILL.md at rel_path (relative to the skill root) would be packaged."""
@@ -157,6 +206,8 @@ def validate_skill(skill_path):
     if not isinstance(name, str):
         return False, f"Name must be a string, got {type(name).__name__}"
     name = name.strip()
+    if not name:
+        return False, "The `name` in frontmatter is empty"
     if name:
         # Check naming convention (kebab-case: lowercase with hyphens)
         if not re.match(r'^[a-z0-9-]+$', name):
@@ -166,12 +217,35 @@ def validate_skill(skill_path):
         # Check name length (max 64 characters per spec)
         if len(name) > 64:
             return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters."
+        # Reserved words are rejected on upload. Match whole hyphen-separated
+        # words, so `claude-helper` fails but a name like `claudette` does not.
+        reserved = sorted(set(name.split('-')) & RESERVED_NAME_WORDS)
+        if reserved:
+            return False, (
+                f"Name '{name}' contains the reserved word(s) {', '.join(reserved)}. "
+                "Upload rejects them; pick a different name."
+            )
+        # Claude Code reserves this folder name and skips a skill authored under it.
+        if name == RESERVED_NAME:
+            return False, (
+                f"Name '{name}' is reserved: Claude Code uses ~/.claude/skills/{name}/ "
+                "for skills synced from claude.ai and skips a skill authored under it."
+            )
+        # The upload zip requires the folder name to equal the skill's name.
+        folder = skill_path.resolve().name
+        if folder != name:
+            return False, (
+                f"Folder name '{folder}' does not match the skill name '{name}'. "
+                "Rename one so they are equal; upload requires it."
+            )
 
     # Extract and validate description
     description = frontmatter.get('description', '')
     if not isinstance(description, str):
         return False, f"Description must be a string, got {type(description).__name__}"
     description = description.strip()
+    if not description:
+        return False, "The `description` in frontmatter is missing or empty"
     if description:
         # Check for angle brackets
         if '<' in description or '>' in description:
@@ -198,4 +272,8 @@ if __name__ == "__main__":
 
     valid, message = validate_skill(sys.argv[1])
     print(message)
+    if valid:
+        # Warnings never change the exit code.
+        for warning in collect_warnings(sys.argv[1]):
+            print(f"Warning: {warning}")
     sys.exit(0 if valid else 1)

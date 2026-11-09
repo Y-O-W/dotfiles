@@ -36,7 +36,10 @@ specifically the block-scalar `description` that breaks discovery.
 **Account skills also arrive here.** Skills registered on the account sync
 into Claude Code under `~/.claude/skills/synced/<account>_<install>/`
 (Claude Code 2.1.273 or later; at session start, then roughly every 10
-minutes, per Anthropic's help article "Use skills in Claude"). That folder is
+minutes, per Anthropic's help article "Use skills in Claude"; set
+`syncClaudeAiSkills` to `false` to turn it off, which would also remove
+`docx`, `pdf`, `pptx` and `xlsx`). The sync is one-way and does not reach the
+Skills API, which has its own upload. That folder is
 a runtime cache Claude Code recreates itself — never edit it, never commit
 it. Directly observed: six skills uploaded to the account showed up in it
 within about ten minutes.
@@ -80,7 +83,9 @@ at the next sync while the user believes the skill is installed.
 ### The supported route: upload
 
 Customize → Skills → + → Create skill → Upload a skill (older UI wording:
-Settings → Capabilities → Skills → Add skill → Upload skill). Requirements:
+Settings → Capabilities → Skills → Add skill → Upload skill). Uploading needs
+a Pro, Max, Ultra, Team or Enterprise plan with code execution enabled.
+Requirements:
 
 - a zip with the skill folder as its root, so `<skill-name>/SKILL.md`
 - folder name equal to the skill's `name`
@@ -142,8 +147,12 @@ uploading.
 3. **Once registered,** the account copy syncs into Claude Code as well.
    Claude Code lists the personal copy and the account copy as separate
    entries (the account ones carry an `anthropic-skills:` prefix), so they
-   don't collide by name; the cost is the description appearing twice. Which
-   one is used when a request matches both has not been verified.
+   don't collide by name; the cost is the description appearing twice, and
+   a duplicate can push other skills' descriptions out of the listing (see
+   "When a skill isn't triggering" in `SKILL.md`). Observed 2026-10-18: the
+   plain name `/<name>` runs the personal copy and `/anthropic-skills:<name>`
+   runs the synced one. Which one Claude picks on its own when a request
+   matches both is not documented, so the risk is drift between the copies.
    `verify_desktop_registration` flags a skill that exists both ways.
 4. If Desktop isn't installed or agent mode has never been used, skip the
    Desktop step rather than creating directories speculatively.
@@ -178,6 +187,13 @@ skill from Desktop's cache — a complete copy, but only a cache, so do it soon 
 into `~/.claude/skills/<name>/`, never overwriting, and prints the
 `chezmoi add` to run next. It doesn't touch the repo itself, since chezmoi
 renames some files in its source tree.
+
+Before vendoring a third-party package, and again before each upstream bump,
+audit it: read every file including scripts, check that scripts do what the
+skill says, and look for external URL fetches, network calls, hardcoded
+credentials and instructions unrelated to the skill's purpose. Anthropic's
+guidance is to use skills only from trusted sources. Record the result in the
+pin file below.
 
 A vendored third-party package additionally needs a pin file outside the
 deployed tree: source URL, full commit SHA, upstream version, license, the date
