@@ -49,7 +49,32 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 
 - `ssh-add --apple-use-keychain ~/.ssh/id_ed25519` (the private key is not in this repo).
 - `gh auth login` (needed by the git credential helper and `$GITHUB_USERNAME` in `.zshrc`).
+- In this repo: `git config --local agent.protectMain true` (opts in to the
+  [protect-main hook](#git-hooks); per-repo config can't be carried by chezmoi).
 - Mac App Store apps and Rosetta are out of scope.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `chezmoi edit <file>` / `chezmoi cd` | edit the source, then `chezmoi apply` |
+| `chezmoi diff` | preview changes |
+| `chezmoi apply` | write source to `$HOME` |
+| `chezmoi update` | `git pull` and apply |
+| `chezmoi status` | managed files that differ from source |
+| `chezmoi unmanaged <path>…` | untracked files under a path (never run without a path) |
+| `bin/sync-dotfiles.sh [<path>… \| --all]` | report or pull local drift |
+| `bin/update-dev-versions.sh` | bump Ruby and Homebrew packages, see [Dev environment](#dev-environment) |
+| `bin/newrepo <name> --public\|--private` | scaffold a GitHub repo for an AI coding agent, see below |
+
+### New repos
+
+`bin/newrepo my-app --private` creates `./my-app` with a README, a baseline `.gitignore`, a LICENSE
+(public only), `AGENTS.md` extracted from the vault template note and a one-line `CLAUDE.md`, makes
+the first commit, creates the GitHub repo and protects `main`: a ruleset for public repos, the
+[protect-main hook](#git-hooks) for private ones. Options: `--openspec`, `--gitignore NAME`,
+`--owner OWNER`, `--local-only`; see `bin/newrepo --help`. It reads the template from
+`~/Obsidian/Template/template_agents_md.md` (override with `NEWREPO_AGENTS_TEMPLATE`).
 
 ## What's managed
 
@@ -57,78 +82,63 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 |---|---|
 | `dot_zshrc`, `dot_zprofile`, `dot_aliases` | shell config, login env, aliases |
 | `dot_gitconfig.tmpl`, `dot_gitconfig-muhlert.tmpl`, `dot_gitignore_global` | git config, per-org commit email for `~/Developer/work/muhlertdigitalgmbh/` via `includeIf` (emails from chezmoi data), global ignore |
-| `dot_git-hooks/executable_strip-ai-trailers` | Global `commit-msg` hook that strips AI co-author trailers, registered in `dot_gitconfig.tmpl`, see [Git hooks](#git-hooks) |
+| `dot_git-hooks/` | three global git hooks, registered in `dot_gitconfig.tmpl`, see [Git hooks](#git-hooks) |
 | `dot_irbrc`, `dot_pryrc`, `dot_rspec` | IRB, Pry, RSpec |
 | `dot_vimrc.tmpl`, `dot_vim/plugin/stdheader.vim` | Vim (42 Norm) and 42 header plugin; login/email from chezmoi data |
 | `dot_Brewfile`, `dot_ruby-version` | Homebrew snapshot, pinned rbenv Ruby |
 | `private_dot_ssh/private_config` | `~/.ssh/config` (0600) |
-| `private_dot_claude/` | `~/.claude/` settings, hook, and custom skills |
-| `private_dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md`: global rules for every project, only non-inferable ones, each with its reason |
+| `private_dot_claude/` | `~/.claude/`: settings, global `CLAUDE.md`, hooks, custom skills, see [Claude Code config](#claude-code-config) |
 | `private_Library/…/Code/User/settings.json` | VS Code settings |
 | `dot_rails-templates/rails_new.rb` | Rails template used by the `rails-new` alias |
 | `.chezmoiscripts/` | oh-my-zsh (once), `brew bundle`, Ruby and brand-tokens gems (on change) |
 | `.chezmoiexternal.toml` | Externals: the `brand-tokens` skill, cloned at a pinned tag |
 
-Outside `home/` and not managed: `bin/`, `vendor/`, `README.md`, `LICENSE`.
-Untracked on purpose: `~/.claude/skills/synced/`, `~/.claude/plugins/synced/` (Claude's own caches),
-and runtime state in `~/.claude/` (`projects/`, `cache/`, `history.jsonl`, …).
-`home/.chezmoiignore` skips `.DS_Store` and `__pycache__`.
+- Outside `home/` and not managed: `bin/`, `vendor/`, `README.md`, `LICENSE`.
+- Untracked on purpose: `~/.claude/skills/synced/`, `~/.claude/plugins/synced/` (Claude's own caches),
+  and runtime state in `~/.claude/` (`projects/`, `cache/`, `history.jsonl`, …).
+- `home/.chezmoiignore` skips `.DS_Store` and `__pycache__`.
 
-### Git hooks
+## Git hooks
 
-A config-based hook (git >= 2.54) in `home/dot_gitconfig.tmpl` runs `~/.git-hooks/strip-ai-trailers`
-(`home/dot_git-hooks/executable_strip-ai-trailers`) on every `commit-msg`:
+Global hooks are config-based (git >= 2.54): each is a `[hook "<name>"]` block in
+`home/dot_gitconfig.tmpl` with an `event` and a `command`, pointing at a script in
+`home/dot_git-hooks/` (deployed to `~/.git-hooks/`). They run in addition to a repo's own hooks, so
+`core.hooksPath` stays unset; that setting would replace `.git/hooks` and need a dispatcher and a
+symlink per hook name.
 
-```gitconfig
-[hook "strip-ai-trailers"]
-	event = commit-msg
-	command = ~/.git-hooks/strip-ai-trailers
-```
+| Hook | Event | Runs in | Does |
+|---|---|---|---|
+| `strip-ai-trailers` | `commit-msg` | every repo | strips `Co-Authored-By:` lines that mention Claude or Anthropic, and "Generated with Claude" lines; human co-authors are kept |
+| `protect-main` | `pre-push` | repos with `agent.protectMain=true` | blocks any push to `main`/`master` |
+| `scan-staged-secrets` | `pre-commit` | every repo | blocks the commit when `gitleaks` finds a secret in the staged changes |
 
-It strips `Co-Authored-By:` lines that mention Claude or Anthropic, and "Generated with Claude"
-lines. Human co-authors are kept. Claude Code's `attribution.commit = ""` only changes what the
-model is offered; it does not scrub a message the model writes itself, so this is the enforcement
-for every tool that commits.
+**strip-ai-trailers.** Claude Code's `attribution.commit = ""` only changes what the model is
+offered; it does not scrub a message the model writes itself, so this hook is the enforcement for
+every tool that commits.
 
-Why not `core.hooksPath`: it *replaces* a repo's `.git/hooks` instead of adding to it, which needs a
-dispatcher and a symlink per hook name to keep repo hooks working. Config-based hooks run in
-addition to the repo's own hooks, so `core.hooksPath` stays unset and nothing needs chaining.
+**protect-main.** Opt in per repo with `git config --local agent.protectMain true`; the setting lives
+in untracked `.git/config`, which is why [Manual steps](#manual-steps) lists it and `bin/newrepo`
+sets it for new private repos. Merging a PR is not affected: it happens on GitHub's side
+(`gh pr merge`, the merge button) and never runs `git push`, so the admin bypass for merging your
+own PRs keeps working. Why local: this repo's ruleset has an Admin bypass with mode `always`, which
+also lets a direct push to `main` through, including by an agent using your credentials.
 
-Limits: needs git >= 2.54 (an older git ignores the `[hook]` section silently),
-`git commit --no-verify` skips it, and only new commits are affected. To add another global hook,
-add a script under `home/dot_git-hooks/` and another `[hook "<name>"]` block with its `event`.
-
-#### protect-main (pre-push)
-
-`~/.git-hooks/protect-main` (`home/dot_git-hooks/executable_protect-main`) refuses any `git push`
-to `main`/`master`, but only in repos that opted in. Merging a PR is not affected: it happens on
-GitHub's side (`gh pr merge`, the merge button) and never runs `git push`, so the admin bypass for
-merging your own PRs keeps working. `git push --no-verify` skips the hook. The opt-in is per repo
-and lives in untracked `.git/config`, so chezmoi can't carry it. After cloning this repo on a new
-machine, run once:
-
-```sh
-git config --local agent.protectMain true
-```
-
-`bin/newrepo` sets it for new private repos. Why local: this repo's ruleset has an Admin bypass
-with mode `always`, which also lets a direct push to `main` through, including by an agent using
-your credentials.
-
-#### scan-staged-secrets (pre-commit)
-
-`~/.git-hooks/scan-staged-secrets` (`home/dot_git-hooks/executable_scan-staged-secrets`) runs
-`gitleaks git --staged` on every commit in every repo (no opt-in) and blocks the commit when it
-finds a secret. GitHub's own secret scanning and push protection are not available for private
+**scan-staged-secrets.** GitHub's secret scanning and push protection are not available for private
 repos on the Free plan (the API returns no security settings for them), so this is the only scan
-those repos get. Output is redacted. `gitleaks` comes from `dot_Brewfile`.
+those repos get. It runs `gitleaks git --staged` (`gitleaks` comes from `dot_Brewfile`) and redacts
+its output. Only a found secret blocks (`--exit-code 2`); a missing or broken gitleaks fails open
+with a warning. False positive: add the fingerprint it prints to the repo's `.gitleaksignore`.
 
-- Only a found secret blocks (`--exit-code 2`); a missing or broken gitleaks fails open with a
-  warning, so a broken scanner never stops every commit.
-- False positive: add the fingerprint it prints to the repo's `.gitleaksignore`.
-- `git commit --no-verify` skips it. It scans only what is being committed, not history already in a repo.
+Limits: an older git ignores the `[hook]` section silently, `--no-verify` skips every hook, and
+only new commits and pushes are affected (`scan-staged-secrets` does not scan history already in a
+repo). To add a hook, put a script under `home/dot_git-hooks/` and add a `[hook "<name>"]` block.
 
-### Skills
+## Claude Code config
+
+`home/private_dot_claude/` deploys to `~/.claude/`: `settings.json` (hook wiring and deny rules for
+`git push` to `main`/`master`), `CLAUDE.md` (global rules: only non-inferable ones, each with its
+reason, incident and date), `hooks/` (`epic-handoff-nudge.py`, `skill-usage-tracker.py`) and
+`skills/`.
 
 Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.
 Claude Desktop uploads and the `synced/` cache are derived copies, not backups. Vendored
@@ -137,9 +147,9 @@ third-party skills (`kepano/obsidian-skills`) have their provenance pinned in
 
 One exception: **`brand-tokens` is an external, not a tracked copy.** `home/.chezmoiexternal.toml`
 clones `github.com/Y-O-W/brand` into `~/.claude/skills/brand-tokens`, pinned to a release tag;
-that repo is its home. Don't `chezmoi add` it or edit it in place. To upgrade, change the tag (twice)
-in `.chezmoiexternal.toml` and run `chezmoi apply --refresh-externals`; the
-`run_onchange_after_30-brand-tokens-gems.sh` script then installs the skill's gems.
+that repo is its home, so don't `chezmoi add` it or edit it in place. To upgrade, change the tag
+(it appears twice) in `.chezmoiexternal.toml` and run `chezmoi apply --refresh-externals`;
+`run_onchange_after_30-brand-tokens-gems.sh` then installs the skill's gems.
 
 To find skills that exist only on the Claude account:
 
@@ -149,15 +159,16 @@ python3 -m scripts.check_skill_backup             # flag skills with no pushed h
 python3 -m scripts.check_skill_backup --harvest   # also copy account-only skills out of Desktop's cache
 ```
 
-## Dev versions
+## Dev environment
 
 - `bin/update-dev-versions.sh` bumps Ruby to the latest patch of the pinned minor line, upgrades
-  Brewfile packages, refreshes the snapshot, applies it and commits (never pushes).
-- It only reports, never applies: Ruby minor/major bumps, PostgreSQL major bumps (need
-  `pg_upgrade` or dump/restore), and Rails (pinned per project).
-- **New apps** use Ruby `4.0.6` (global pin; existing apps keep their own `.ruby-version`) and
-  PostgreSQL 17 on port 5433, alongside `postgresql@15` on 5432. `rails-new my_app` expands to
-  `rails new -d postgresql -m ~/.rails-templates/rails_new.rb`, which sets `port: 5433`.
+  Brewfile packages, refreshes the snapshot, applies it and commits (never pushes). It only
+  reports, never applies: Ruby minor/major bumps, PostgreSQL major bumps (need `pg_upgrade` or
+  dump/restore), and Rails (pinned per project).
+- **New apps** use the global Ruby pin in `home/dot_ruby-version` (existing apps keep their own
+  `.ruby-version`) and PostgreSQL 17 on port 5433, alongside `postgresql@15` on 5432.
+  `rails-new my_app` expands to `rails new -d postgresql -m ~/.rails-templates/rails_new.rb`,
+  which sets `port: 5433`.
 
 ### Dev server ports
 
@@ -173,28 +184,13 @@ python3 -m scripts.check_skill_backup --harvest   # also copy account-only skill
 | PostgreSQL | 5432 (`@15`), 5433 (`@17`) | |
 | Redis | 6379 | default |
 
-## Commands
+## Notes and history
 
-| Command | What it does |
-|---|---|
-| `chezmoi edit <file>` / `chezmoi cd` | edit the source, then `chezmoi apply` |
-| `chezmoi diff` | preview changes |
-| `chezmoi apply` | write source to `$HOME` |
-| `chezmoi update` | `git pull` and apply |
-| `chezmoi status` | managed files that differ from source |
-| `chezmoi unmanaged <path>…` | untracked files under a path (never run without a path) |
-| `bin/sync-dotfiles.sh [<path>… \| --all]` | report or pull local drift |
-
-## Fork notes
-
-Personal fork of [`lewagon/dotfiles`](https://github.com/lewagon/dotfiles); `origin` is
-`Y-O-W/dotfiles`, `upstream` is the Le Wagon repo.
-
-- Up to date with `upstream/master` as of 2026-09-28 (last upstream commit 2025-12-02).
-- Moved from a hand-rolled `install.sh` to chezmoi on 2026-07-14. The old install scripts and
-  loose root-level config files are retired.
-- Now covers the whole dev environment: Homebrew, rbenv/Ruby, VS Code, SSH, and Claude Code
-  config, skills and hooks.
+- Started as a fork of [`lewagon/dotfiles`](https://github.com/lewagon/dotfiles); since 2026-11 it is
+  detached from the fork network and has no `upstream` remote.
+- Moved from a hand-rolled `install.sh` to chezmoi on 2026-07-14; the old install scripts and loose
+  root-level config files are retired. It now covers the whole dev environment: Homebrew,
+  rbenv/Ruby, VS Code, SSH, and Claude Code config, skills and hooks.
 - Chezmoi gotchas: a bare `run_` prefix in the source tree is treated as a script (use
   `literal_`), and zero-byte files are dropped unless prefixed `empty_`.
 - The locally modified `skill-creator` was retired in favour of `skill-creator-plus`; it remains
