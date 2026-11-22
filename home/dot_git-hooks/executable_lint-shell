@@ -1,0 +1,101 @@
+#!/bin/sh
+# pre-commit hook: lint staged shell scripts with shellcheck and check the conventions of
+# new ones (see "Shell scripts" in the dotfiles README).
+#
+# Registered globally in ~/.gitconfig as a config-based hook (git >= 2.54):
+#
+#   [hook "lint-shell"]
+#     event = pre-commit
+#     command = ~/.git-hooks/lint-shell
+#
+# Runs in every repo. A file counts as a shell script when its first line is a #!/bin/sh,
+# #!/bin/bash, #!/usr/bin/env bash or #!/usr/bin/env sh shebang. That is also what skips
+# chezmoi templates (*.sh.tmpl start with a template line, not a shebang).
+#
+# Two checks, deliberately of different strength so a legacy script never blocks an unrelated edit:
+#   1. shellcheck at warning level on every staged shell script (added or modified): real bugs only.
+#   2. policy_violation() on newly ADDED shell scripts only: the conventions apply to new files,
+#      existing ones are brought in line when someone is already changing them.
+#
+# Exit codes: only a found problem blocks the commit. shellcheck missing fails OPEN with a warning,
+# so a broken toolchain never stops all commits on a machine.
+# Limits: paths containing a newline are not supported. Skip once: `git commit --no-verify`
+# (also skips the other hooks).
+
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "lint-shell: shellcheck not found, shell lint SKIPPED (brew install shellcheck)" >&2
+  exit 0
+fi
+
+# Succeeds when $1 is one of the shebangs this hook treats as a shell script.
+is_shell_shebang() {
+  case "$1" in
+    '#!/bin/sh' | '#!/bin/sh '* | '#!/bin/bash' | '#!/bin/bash '* | '#!/usr/bin/env bash' | '#!/usr/bin/env sh') return 0 ;;
+  esac
+  return 1
+}
+
+# Called for each newly added shell script.
+#   $1 path in the repo   $2 its first line (the shebang)   $3 "exec" or "plain"
+# `exec` means it is executable: git mode 100755, or a chezmoi source file named executable_*
+# (chezmoi sets the mode on deploy, so such a file is often 100644 in git).
+# Print one line saying what is wrong and return 0 to block the commit; return 1 when it is fine.
+policy_violation() {
+  path=$1
+  shebang=$2
+  kind=$3
+  case "$shebang" in
+    '#!/usr/bin/env bash' | '#!/bin/sh') ;;
+    *)
+      echo "shebang is '$shebang'; use '#!/usr/bin/env bash' (or '#!/bin/sh' for a tiny hook)"
+      return 0
+      ;;
+  esac
+  case "$kind:$path" in
+    exec:*.sh)
+      echo "a command has no extension; rename it without .sh"
+      return 0
+      ;;
+    plain:*.sh) ;;
+    plain:*)
+      echo "a non-executable shell file is a library; give it a .sh extension (or make it executable)"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+failed=0
+files=$(git diff --cached --name-only --diff-filter=ACM)
+[ -n "$files" ] || exit 0
+
+while IFS= read -r path; do
+  shebang=$(git show ":$path" 2>/dev/null | head -n 1)
+  is_shell_shebang "$shebang" || continue
+
+  if ! git show ":$path" | shellcheck --severity=warning --external-sources --format=gcc - >&2; then
+    echo "lint-shell: shellcheck warnings in $path (the staged version)" >&2
+    failed=1
+  fi
+
+  # Policy applies to files that are new in this commit.
+  if git diff --cached --name-only --diff-filter=A | grep -qxF -- "$path"; then
+    mode=$(git ls-files -s -- "$path" | cut -c1-6)
+    case "$mode:${path##*/}" in
+      100755:* | *:executable_*) kind='exec' ;;
+      *) kind='plain' ;;
+    esac
+    if reason=$(policy_violation "$path" "$shebang" "$kind"); then
+      echo "lint-shell: $path: $reason" >&2
+      failed=1
+    fi
+  fi
+done <<EOF
+$files
+EOF
+
+if [ "$failed" -ne 0 ]; then
+  echo "lint-shell: commit blocked. Fix the above, or skip once with --no-verify." >&2
+  exit 1
+fi
+exit 0

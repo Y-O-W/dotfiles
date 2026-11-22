@@ -30,8 +30,8 @@ root (set by `.chezmoiroot`); the repo is expected at `~/Developer/personal/dotf
 
 ```sh
 cd ~/Developer/personal/dotfiles
-bin/sync-dotfiles.sh          # 1. report local drift (changes nothing)
-bin/sync-dotfiles.sh <path>…  # 2. pull the drift you want to keep (or --all)
+bin/sync-dotfiles          # 1. report local drift (changes nothing)
+bin/sync-dotfiles <path>…  # 2. pull the drift you want to keep (or --all)
 git diff                      # 3. review, then commit and push yourself
 git pull --rebase && chezmoi apply   # 4. take changes from other machines
 ```
@@ -43,7 +43,7 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 - "config file template has changed" warning: run `chezmoi init`. The template sets `sourceDir`,
   so the config keeps pointing at this repo.
 - After `brew install`/`uninstall`: `brew bundle dump --file="$HOME/.Brewfile" --force`, then
-  `bin/sync-dotfiles.sh ~/.Brewfile`.
+  `bin/sync-dotfiles ~/.Brewfile`.
 
 ### Manual steps
 
@@ -63,8 +63,8 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 | `chezmoi update` | `git pull` and apply |
 | `chezmoi status` | managed files that differ from source |
 | `chezmoi unmanaged <path>…` | untracked files under a path (never run without a path) |
-| `bin/sync-dotfiles.sh [<path>… \| --all]` | report or pull local drift |
-| `bin/update-dev-versions.sh` | bump Ruby and Homebrew packages, see [Dev environment](#dev-environment) |
+| `bin/sync-dotfiles [<path>… \| --all]` | report or pull local drift |
+| `bin/update-dev-versions` | bump Ruby and Homebrew packages, see [Dev environment](#dev-environment) |
 | `bin/newrepo <name> --public\|--private` | scaffold a GitHub repo for an AI coding agent, see below |
 
 ### New repos
@@ -82,7 +82,7 @@ the first commit, creates the GitHub repo and protects `main`: a ruleset for pub
 |---|---|
 | `dot_zshrc`, `dot_zprofile`, `dot_aliases` | shell config, login env, aliases |
 | `dot_gitconfig.tmpl`, `dot_gitconfig-muhlert.tmpl`, `dot_gitignore_global` | git config, per-org commit email for `~/Developer/work/muhlertdigitalgmbh/` via `includeIf` (emails from chezmoi data), global ignore |
-| `dot_git-hooks/` | three global git hooks, registered in `dot_gitconfig.tmpl`, see [Git hooks](#git-hooks) |
+| `dot_git-hooks/` | four global git hooks, registered in `dot_gitconfig.tmpl`, see [Git hooks](#git-hooks) |
 | `dot_irbrc`, `dot_pryrc`, `dot_rspec` | IRB, Pry, RSpec |
 | `dot_vimrc.tmpl`, `dot_vim/plugin/stdheader.vim` | Vim (42 Norm) and 42 header plugin; login/email from chezmoi data |
 | `dot_Brewfile`, `dot_ruby-version` | Homebrew snapshot, pinned rbenv Ruby |
@@ -111,6 +111,7 @@ symlink per hook name.
 | `strip-ai-trailers` | `commit-msg` | every repo | strips `Co-Authored-By:` lines that mention Claude or Anthropic, and "Generated with Claude" lines; human co-authors are kept |
 | `protect-main` | `pre-push` | repos with `agent.protectMain=true` | blocks any push to `main`/`master` |
 | `scan-staged-secrets` | `pre-commit` | every repo | blocks the commit when `gitleaks` finds a secret in the staged changes |
+| `lint-shell` | `pre-commit` | every repo | blocks the commit on `shellcheck` warnings in staged shell scripts, and on new scripts that break the [shell conventions](#shell-scripts) |
 
 **strip-ai-trailers.** Claude Code's `attribution.commit = ""` only changes what the model is
 offered; it does not scrub a message the model writes itself, so this hook is the enforcement for
@@ -132,6 +133,32 @@ with a warning. False positive: add the fingerprint it prints to the repo's `.gi
 Limits: an older git ignores the `[hook]` section silently, `--no-verify` skips every hook, and
 only new commits and pushes are affected (`scan-staged-secrets` does not scan history already in a
 repo). To add a hook, put a script under `home/dot_git-hooks/` and add a `[hook "<name>"]` block.
+
+## Shell scripts
+
+Conventions for every shell script written on this machine (`bin/`, hooks, one-off tools). What a
+linter can decide is enforced by `shellcheck` through the `lint-shell` hook; the rest is written
+down here because no tool checks it.
+
+| Topic | Rule |
+|---|---|
+| Language | Bash for anything with logic. POSIX `#!/bin/sh` only for tiny hooks that must run anywhere (`dot_git-hooks/`). Past about 100 lines, or when you parse JSON or need real data structures, write Python instead (like `private_dot_claude/hooks/`). |
+| Shebang | `#!/usr/bin/env bash` (or `#!/bin/sh`), never `#!/bin/bash`. `env` finds the first bash on `PATH`, so a Homebrew bash is used when it exists. |
+| Bash version | Write for bash 3.2, the stock `/bin/bash` on macOS, because `env bash` lands there when no newer one is installed. No `mapfile`/`readarray`, associative arrays, `${var,,}`, `&>>` or `\|&`. Check with `/bin/bash -n script`. |
+| Name | A command you run (`bin/`) has **no extension**, in kebab-case: `newrepo`, `sync-dotfiles`. A file that is only `source`d is a library: `.sh`, not executable, no `set` flags. The caller should not need to know the language. |
+| Header | Shebang, then a comment block (what it does, usage, side effects, env overrides), then `set -euo pipefail`. `--help` prints that comment block. |
+| Errors | A `die()` that prints `<script>: <message>` to stderr and exits 1; exit 2 for a usage error. Check each dependency with `command -v` before doing anything. |
+| Safety | Quote every expansion. `[[ ]]` over `[ ]`. `local` in functions. `mktemp` plus a `trap ... EXIT` for temp files; a failed run must leave nothing half-built. Pass `--` before user-supplied arguments. `printf` over `echo` for data. Guard `"${arr[@]}"` with a length test (bash 3.2 plus `set -u` errors on an empty array). |
+| Lint | `shellcheck` clean. A `# shellcheck disable=SCxxxx` needs a reason on the same line. Formatting is by hand (2 spaces); `shfmt` is not enforced because its default style rewrites the aligned one-line `case` arms. |
+
+**Exceptions.** Files chezmoi runs or names (`home/.chezmoiscripts/*.sh.tmpl`, `executable_*`) keep
+the names chezmoi needs. Do not edit the `.chezmoiscripts` only to restyle them: `run_onchange_`
+and `run_once_` scripts re-run when their content changes.
+
+**Enforcement.** `lint-shell` runs `shellcheck --severity=warning` on every staged shell script, so a
+legacy script never blocks an unrelated edit, and checks the shebang and name rules on *new* scripts
+only. `~/.shellcheckrc` comes from `home/dot_shellcheckrc`; `shellcheck` from `dot_Brewfile`. The
+hook is the enforcement; this section and the short rule in `~/.claude/CLAUDE.md` are context.
 
 ## Claude Code config
 
@@ -161,7 +188,7 @@ python3 -m scripts.check_skill_backup --harvest   # also copy account-only skill
 
 ## Dev environment
 
-- `bin/update-dev-versions.sh` bumps Ruby to the latest patch of the pinned minor line, upgrades
+- `bin/update-dev-versions` bumps Ruby to the latest patch of the pinned minor line, upgrades
   Brewfile packages, refreshes the snapshot, applies it and commits (never pushes). It only
   reports, never applies: Ruby minor/major bumps, PostgreSQL major bumps (need `pg_upgrade` or
   dump/restore), and Rails (pinned per project).

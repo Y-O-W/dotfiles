@@ -13,6 +13,9 @@ Only rules that apply on every task and cannot be inferred from code or docs. Ea
 - Every line of a Bash command must serve the task: no leftover or scratch commands (`cat > /tmp/x`, test echoes) in front of the real command. Reread the command before sending it.
   Why: a prepended scratch command is how the hang above happens, and it stops the real command from running.
   Incident: a later stray `cat > /dev/null` was harmless only because it carried a heredoc. Added 2026-11-22.
+- When writing a shell script, follow "Shell scripts" in the dotfiles README (`~/Developer/personal/dotfiles/README.md`): `#!/usr/bin/env bash`, bash 3.2 syntax, no extension for commands, `.sh` only for sourced libraries, `shellcheck` clean.
+  Why: the machine's `/bin/bash` is 3.2, so newer syntax breaks, and no linter checks that; the `lint-shell` hook covers shellcheck warnings and the naming and shebang of new scripts.
+  Incident: `bin/` held `newrepo` without an extension next to two `.sh` scripts, all with `#!/bin/bash`. Added 2026-11-22.
 
 ## Maintenance
 

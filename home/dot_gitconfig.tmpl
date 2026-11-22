@@ -83,6 +83,11 @@
 	event = pre-commit
 	command = ~/.git-hooks/scan-staged-secrets
 
+# Lints staged shell scripts with shellcheck and checks the conventions of new ones; fails open if shellcheck is missing.
+[hook "lint-shell"]
+	event = pre-commit
+	command = ~/.git-hooks/lint-shell
+
 [user]
 	email = {{ .emailPersonal }}
 	name = Y-O-W
