@@ -155,16 +155,25 @@ down here because no tool checks it.
 the names chezmoi needs. Do not edit the `.chezmoiscripts` only to restyle them: `run_onchange_`
 and `run_once_` scripts re-run when their content changes.
 
-**Enforcement.** `lint-shell` runs `shellcheck --severity=warning` on every staged shell script, so a
-legacy script never blocks an unrelated edit, and checks the shebang and name rules on *new* scripts
-only. `~/.shellcheckrc` comes from `home/dot_shellcheckrc`; `shellcheck` from `dot_Brewfile`. The
-hook is the enforcement; this section and the short rule in `~/.claude/CLAUDE.md` are context.
+**Enforcement.** Two hooks, at different moments, running the same `shellcheck --severity=warning`:
+
+- `shell-write-guard.py` is a Claude Code `PreToolUse` hook on `Write` and `Edit`. It denies the call
+  *before* the file is written, so the agent gets the finding and can retry. On a new script it checks
+  the shebang and refuses an `executable_*.sh` name; on any shell file it blocks only the shellcheck
+  findings the call *introduces*, so a legacy script with old warnings can still be edited. It cannot
+  see the file mode, files written through Bash, or edits made outside Claude.
+- `lint-shell` is a git `pre-commit` hook and the backstop for what the guard cannot see. It runs
+  shellcheck on every staged shell script and checks the shebang and name rules (including plain
+  versus executable) on *new* scripts only. `git commit --no-verify` skips it.
+
+`~/.shellcheckrc` comes from `home/dot_shellcheckrc`; `shellcheck` from `dot_Brewfile`. The hooks are
+the enforcement; this section and the short rule in `~/.claude/CLAUDE.md` are context.
 
 ## Claude Code config
 
 `home/private_dot_claude/` deploys to `~/.claude/`: `settings.json` (hook wiring and deny rules for
 `git push` to `main`/`master`), `CLAUDE.md` (global rules: only non-inferable ones, each with its
-reason, incident and date), `hooks/` (`epic-handoff-nudge.py`, `skill-usage-tracker.py`) and
+reason, incident and date), `hooks/` (`epic-handoff-nudge.py`, `shell-write-guard.py`, `skill-usage-tracker.py`) and
 `skills/`.
 
 Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.
