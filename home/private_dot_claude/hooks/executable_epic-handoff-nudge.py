@@ -5,7 +5,8 @@ best-effort routing.
 
 Two events, one script (the event name comes from the hook input):
 
-- UserPromptSubmit: the prompt starts with /opsx:apply or /speckit.implement.
+- UserPromptSubmit: the prompt starts with /openspec-apply-change (OpenSpec 2.x skill),
+  /opsx:apply (OpenSpec 1.x command, kept for older installs) or /speckit.implement.
 - PostToolUse (matcher ExitPlanMode): a Claude Code plan was just approved.
 
 It never blocks. It adds context telling the model to offer the skill first,
@@ -20,7 +21,7 @@ SKILL = "change-to-github-epic"
 
 # Slash commands that start the build phase. Anchored to the start of the prompt
 # so a sentence that merely mentions them does not trigger.
-BUILD_COMMANDS = re.compile(r"^\s*/(opsx:apply|speckit\.implement)\b")
+BUILD_COMMANDS = re.compile(r"^\s*/(openspec-apply-change|opsx:apply|speckit\.implement)\b")
 
 # Evidence the skill already ran: a Skill tool call, or the /<skill> slash command.
 ALREADY_RAN = re.compile(
