@@ -115,6 +115,19 @@ git config --local agent.protectMain true
 with mode `always`, which also lets a direct push to `main` through, including by an agent using
 your credentials.
 
+#### scan-staged-secrets (pre-commit)
+
+`~/.git-hooks/scan-staged-secrets` (`home/dot_git-hooks/executable_scan-staged-secrets`) runs
+`gitleaks git --staged` on every commit in every repo (no opt-in) and blocks the commit when it
+finds a secret. GitHub's own secret scanning and push protection are not available for private
+repos on the Free plan (the API returns no security settings for them), so this is the only scan
+those repos get. Output is redacted. `gitleaks` comes from `dot_Brewfile`.
+
+- Only a found secret blocks (`--exit-code 2`); a missing or broken gitleaks fails open with a
+  warning, so a broken scanner never stops every commit.
+- False positive: add the fingerprint it prints to the repo's `.gitleaksignore`.
+- `git commit --no-verify` skips it. It scans only what is being committed, not history already in a repo.
+
 ### Skills
 
 Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.

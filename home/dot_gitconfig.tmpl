@@ -78,6 +78,11 @@
 	event = pre-push
 	command = ~/.git-hooks/protect-main
 
+# Scans staged changes for secrets with gitleaks in every repo; fails open if gitleaks is missing.
+[hook "scan-staged-secrets"]
+	event = pre-commit
+	command = ~/.git-hooks/scan-staged-secrets
+
 [user]
 	email = {{ .emailPersonal }}
 	name = Y-O-W
