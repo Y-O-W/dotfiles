@@ -63,6 +63,7 @@ git pull --rebase && chezmoi apply   # 4. take changes from other machines
 | `dot_Brewfile`, `dot_ruby-version` | Homebrew snapshot, pinned rbenv Ruby |
 | `private_dot_ssh/private_config` | `~/.ssh/config` (0600) |
 | `private_dot_claude/` | `~/.claude/` settings, hook, and custom skills |
+| `private_dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md`: global rules for every project, only non-inferable ones, each with its reason |
 | `private_Library/…/Code/User/settings.json` | VS Code settings |
 | `dot_rails-templates/rails_new.rb` | Rails template used by the `rails-new` alias |
 | `.chezmoiscripts/` | oh-my-zsh (once), `brew bundle`, Ruby and brand-tokens gems (on change) |
