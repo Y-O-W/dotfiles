@@ -98,6 +98,23 @@ Limits: needs git >= 2.54 (an older git ignores the `[hook]` section silently),
 `git commit --no-verify` skips it, and only new commits are affected. To add another global hook,
 add a script under `home/dot_git-hooks/` and another `[hook "<name>"]` block with its `event`.
 
+#### protect-main (pre-push)
+
+`~/.git-hooks/protect-main` (`home/dot_git-hooks/executable_protect-main`) refuses any `git push`
+to `main`/`master`, but only in repos that opted in. Merging a PR is not affected: it happens on
+GitHub's side (`gh pr merge`, the merge button) and never runs `git push`, so the admin bypass for
+merging your own PRs keeps working. `git push --no-verify` skips the hook. The opt-in is per repo
+and lives in untracked `.git/config`, so chezmoi can't carry it. After cloning this repo on a new
+machine, run once:
+
+```sh
+git config --local agent.protectMain true
+```
+
+`bin/newrepo` sets it for new private repos. Why local: this repo's ruleset has an Admin bypass
+with mode `always`, which also lets a direct push to `main` through, including by an agent using
+your credentials.
+
 ### Skills
 
 Every personal skill and hook lives here, as plain tracked copies deployed by `chezmoi apply`.
