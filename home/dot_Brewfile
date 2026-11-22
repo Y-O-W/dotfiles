@@ -10,6 +10,8 @@ brew "gdk-pixbuf"
 brew "gh"
 # Distributed revision control system
 brew "git"
+# Audit git repos for secrets (used by the scan-staged-secrets pre-commit hook)
+brew "gitleaks"
 # Portable Foreign Function Interface library
 brew "libffi"
 # Cryptography and SSL/TLS Toolkit
