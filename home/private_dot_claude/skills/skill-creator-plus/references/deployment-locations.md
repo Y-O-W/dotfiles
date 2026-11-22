@@ -220,7 +220,7 @@ When that's the case:
   - If you wrote or copied the skill straight into the live path
     (`~/.claude/skills/<skill-name>/`), pull it into the dotfiles source.
     Look for a sync helper in the repo (commonly something like
-    `bin/sync-dotfiles.sh`) that runs the tool's own "pull drift into
+    `bin/sync-dotfiles`) that runs the tool's own "pull drift into
     source" command (`chezmoi re-add` for chezmoi), or add just the new
     skill directly (`chezmoi add ~/.claude/skills/<skill-name>`). chezmoi
     renames some files in its source tree (for example `literal_run_eval.py`,

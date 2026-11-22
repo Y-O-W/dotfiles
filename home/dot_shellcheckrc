@@ -1,0 +1,3 @@
+# ~/.shellcheckrc: read by shellcheck for every script on this machine.
+# Follow `source`d files, so a script that sources a library is checked together with it.
+external-sources=true

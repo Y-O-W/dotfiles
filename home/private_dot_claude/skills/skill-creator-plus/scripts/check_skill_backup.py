@@ -153,7 +153,7 @@ def main():
             state = backup_state(name)
             note = {"ok": "backed up (tracked, committed, pushed)",
                     "drift": "live folder has changes NOT yet pulled into the repo: "
-                             f"bin/sync-dotfiles.sh ~/.claude/skills/{name}",
+                             f"bin/sync-dotfiles ~/.claude/skills/{name}",
                     "new-files": "live folder has files the repo doesn't track: "
                                  "chezmoi unmanaged ~/.claude/skills/" + name,
                     "uncommitted": "tracked, but has UNCOMMITTED changes: commit and push",

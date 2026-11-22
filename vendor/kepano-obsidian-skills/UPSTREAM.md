@@ -45,7 +45,7 @@ gh api repos/kepano/obsidian-skills/compare/3ccff5338ea700537839b21900aa5358a040
 1. Download upstream at the new commit and diff each skill against `home/private_dot_claude/skills/<name>/`:
    `gh api repos/kepano/obsidian-skills/tarball/<sha> > up.tgz`, extract, `diff -r`.
 2. Copy the changed skill files into `~/.claude/skills/<name>/`, then pull them into this repo with
-   `bin/sync-dotfiles.sh ~/.claude/skills/<name>` (a brand-new file needs `chezmoi add <file>`).
+   `bin/sync-dotfiles ~/.claude/skills/<name>` (a brand-new file needs `chezmoi add <file>`).
 3. Update this file: commit SHA and date, version, the verified date, and any local modification.
    Refresh `LICENSE` and `README.md` if upstream changed them.
 4. Review the diff and commit yourself.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Creates a new GitHub repo that is ready for an AI coding agent -- the scripted
 # version of "New - Public" / "New - Private" in workflow_git.md (issue #46, part
 # of #44), so every repo starts identical.
@@ -73,6 +73,7 @@ write_agents_md() {
   # Only the markdown code block of the note, not its frontmatter or notes.
   awk '/^```markdown/{f=1;next} /^```$/{f=0} f' "$TEMPLATE" > AGENTS.md
   [[ -s AGENTS.md ]] || die "extracting the markdown code block of $TEMPLATE gave an empty file"
+  # shellcheck disable=SC2016 # the backticks are literal template text, not a command substitution
   sed 's/`<repo>`/'"$name"'/' AGENTS.md > AGENTS.md.tmp && mv AGENTS.md.tmp AGENTS.md
   if [[ "$with_openspec" == no ]]; then
     # Drop the "## Specs" section (up to the next "## " heading or the end).

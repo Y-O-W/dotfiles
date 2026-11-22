@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Finds local drift (files edited directly on this machine instead of through
 # `chezmoi edit`) and pulls it into the chezmoi source on request -- see issue
 # #20 for why this exists (issue #14 nearly lost a hooks config to exactly this).
 #
-#   bin/sync-dotfiles.sh              report drift and the diff; change nothing
-#   bin/sync-dotfiles.sh <path>...    pull only those files into the source
-#   bin/sync-dotfiles.sh --all        pull every genuinely drifted file
+#   bin/sync-dotfiles              report drift and the diff; change nothing
+#   bin/sync-dotfiles <path>...    pull only those files into the source
+#   bin/sync-dotfiles --all        pull every genuinely drifted file
 #
 # Report-only is the default because a bare `chezmoi re-add` sweeps up *every*
 # drifted file, including ones unrelated to whatever you're working on -- pulling
@@ -127,8 +127,8 @@ case "$mode" in
       echo "==> Drifted (${#drifted[@]}):"
       for rel in "${drifted[@]}"; do echo "  ~/$rel"; done
       echo
-      echo "  Pull only what you mean to:  bin/sync-dotfiles.sh ~/path/to/file ..."
-      echo "  Pull all of the above:       bin/sync-dotfiles.sh --all"
+      echo "  Pull only what you mean to:  bin/sync-dotfiles ~/path/to/file ..."
+      echo "  Pull all of the above:       bin/sync-dotfiles --all"
     fi
     ;;
 esac
@@ -162,6 +162,6 @@ unmanaged="$(chezmoi unmanaged ~/.claude/skills ~/.claude/hooks | grep -vE "$kno
 if [[ -z "$unmanaged" ]]; then
   echo "  none"
 else
-  echo "$unmanaged" | sed 's/^/  /'
+  while IFS= read -r entry; do printf '  %s\n' "$entry"; done <<<"$unmanaged"
   echo "  -> if any of these should be tracked, add them with 'chezmoi add'."
 fi

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Checks Ruby/Homebrew/PostgreSQL/Rails for available updates and, for the
 # safe cases, applies them to the chezmoi source and commits the result.
 #
