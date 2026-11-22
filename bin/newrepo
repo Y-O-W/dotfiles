@@ -1,0 +1,201 @@
+#!/bin/bash
+# Creates a new GitHub repo that is ready for an AI coding agent -- the scripted
+# version of "New - Public" / "New - Private" in workflow_git.md (issue #46, part
+# of #44), so every repo starts identical.
+#
+#   bin/newrepo <name> --public|--private [options]
+#
+#   --openspec           also run `openspec init --scope project --tools claude`
+#   --gitignore NAME     append a gh template (e.g. Node, Ruby); see `gh repo gitignore list`
+#   --owner OWNER        GitHub owner (default: the logged-in gh user)
+#   --local-only         stop after the first commit; no GitHub repo, no protection
+#   -h, --help           this text
+#
+# Creates ./<name> in the current directory, then: git init -b main, README,
+# .gitignore, LICENSE (public only, BSD-3-Clause), AGENTS.md extracted from the
+# template note, CLAUDE.md (@AGENTS.md), optional OpenSpec, first commit, then
+# `gh repo create --push` and protection for main:
+#   public   server-side ruleset (PR required, no force-push, no deletion)
+#   private  `git config --local agent.protectMain true` (the protect-main hook;
+#            GitHub Free cannot protect branches on private repos)
+#
+# Env overrides:
+#   NEWREPO_AGENTS_TEMPLATE  path of the AGENTS.md template note
+#   NEWREPO_FULLNAME         name written into the LICENSE (default: Yves Wilken)
+#
+# The first commit is the only commit that ever lands on main directly.
+set -euo pipefail
+
+TEMPLATE="${NEWREPO_AGENTS_TEMPLATE:-$HOME/Obsidian/Template/template_agents_md.md}"
+FULLNAME="${NEWREPO_FULLNAME:-Yves Wilken}"
+
+usage() {
+  sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+die() {
+  echo "newrepo: $*" >&2
+  exit 1
+}
+
+# A staged path that must never reach a first commit. Return 0 to refuse it.
+# This is the only gate between `git add .` and a public push, so what counts
+# as a secret is your call.
+is_secret_path() {
+  local base="${1##*/}"
+  case "$base" in
+    # Example files are meant to be committed.
+    .env.example|.env.sample|.env.template|.env.dist) return 1 ;;
+    .env|.env.*) return 0 ;;
+    *.key|*.pem|*.p12|*.pfx) return 0 ;;
+    id_rsa|id_ecdsa|id_ed25519|credentials.json|settings.local.json|.htpasswd) return 0 ;;
+  esac
+  return 1
+}
+
+check_staged_secrets() {
+  local path found=()
+  while IFS= read -r path; do
+    if is_secret_path "$path"; then
+      found+=("$path")
+    fi
+  done < <(git diff --cached --name-only)
+  if [[ ${#found[@]} -gt 0 ]]; then
+    printf 'newrepo: refusing to commit, secret-looking files are staged:\n' >&2
+    printf '  %s\n' "${found[@]}" >&2
+    exit 1
+  fi
+}
+
+write_agents_md() {
+  local with_openspec="$1"
+  [[ -f "$TEMPLATE" ]] || die "AGENTS.md template not found: $TEMPLATE (set NEWREPO_AGENTS_TEMPLATE)"
+  # Only the markdown code block of the note, not its frontmatter or notes.
+  awk '/^```markdown/{f=1;next} /^```$/{f=0} f' "$TEMPLATE" > AGENTS.md
+  [[ -s AGENTS.md ]] || die "extracting the markdown code block of $TEMPLATE gave an empty file"
+  sed 's/`<repo>`/'"$name"'/' AGENTS.md > AGENTS.md.tmp && mv AGENTS.md.tmp AGENTS.md
+  if [[ "$with_openspec" == no ]]; then
+    # Drop the "## Specs" section (up to the next "## " heading or the end).
+    awk '/^## Specs/{skip=1;next} /^## /{skip=0} !skip' AGENTS.md > AGENTS.md.tmp && mv AGENTS.md.tmp AGENTS.md
+  fi
+  echo "@AGENTS.md" > CLAUDE.md
+}
+
+# Ruleset tested in issue #45: PR required (0 approvals), no force-push, no deletion.
+apply_ruleset() {
+  gh api "repos/$1/rulesets" --method POST --silent --input - <<'EOF'
+{
+  "name": "protect-main",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "rules": [
+    { "type": "pull_request", "parameters": { "required_approving_review_count": 0, "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": false } },
+    { "type": "non_fast_forward" },
+    { "type": "deletion" }
+  ]
+}
+EOF
+}
+
+name=""
+visibility=""
+openspec=no
+gitignore=""
+owner=""
+local_only=no
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help)    usage; exit 0 ;;
+    --public)     visibility=public; shift ;;
+    --private)    visibility=private; shift ;;
+    --openspec)   openspec=yes; shift ;;
+    --local-only) local_only=yes; shift ;;
+    --gitignore)  [[ $# -ge 2 ]] || die "--gitignore needs a value"; gitignore="$2"; shift 2 ;;
+    --owner)      [[ $# -ge 2 ]] || die "--owner needs a value"; owner="$2"; shift 2 ;;
+    -*)           usage >&2; die "unknown option: $1" ;;
+    *)            [[ -z "$name" ]] || die "only one repo name allowed (got '$name' and '$1')"; name="$1"; shift ;;
+  esac
+done
+
+[[ -n "$name" ]] || { usage >&2; die "repo name required"; }
+[[ -n "$visibility" ]] || die "choose --public or --private"
+[[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid repo name: $name"
+[[ ! -e "$name" ]] || die "./$name already exists"
+command -v gh >/dev/null 2>&1 || die "gh not found"
+if [[ "$openspec" == yes ]]; then
+  command -v openspec >/dev/null 2>&1 || die "openspec not found (npm install -g @fission-ai/openspec)"
+fi
+# Fail on a missing template before anything is created.
+[[ -f "$TEMPLATE" ]] || die "AGENTS.md template not found: $TEMPLATE (set NEWREPO_AGENTS_TEMPLATE)"
+
+if [[ "$local_only" == no ]]; then
+  gh auth status >/dev/null 2>&1 || die "gh is not logged in (gh auth login)"
+  [[ -n "$owner" ]] || owner="$(gh api user --jq .login)"
+fi
+
+start="$PWD"
+finished=no
+mkdir "$name"
+# Until the local repo is complete, a failure removes the half-built directory
+# so the command can simply be re-run. Set after mkdir: never touches a dir that existed.
+cleanup() {
+  if [[ "$finished" == no ]]; then
+    cd "$start" && rm -rf "${start:?}/$name"
+    echo "newrepo: failed, removed ./$name" >&2
+  fi
+}
+trap cleanup EXIT
+cd "$name"
+git init -q -b main
+
+printf '# %s\n' "$name" > README.md
+# Baseline: secrets and OS junk, whatever the language template says.
+printf '%s\n' '.env' '.env.*' '*.key' '*.pem' 'credentials.json' 'settings.local.json' '.DS_Store' > .gitignore
+if [[ -n "$gitignore" ]]; then
+  { echo; gh repo gitignore view "$gitignore"; } >> .gitignore
+fi
+
+if [[ "$visibility" == public ]]; then
+  gh repo license view BSD-3-Clause > LICENSE
+  sed "s/\[year\]/$(date +%Y)/; s/\[fullname\]/$FULLNAME/" LICENSE > LICENSE.tmp && mv LICENSE.tmp LICENSE
+  echo "LICENSE: $(sed -n '3p' LICENSE)"
+fi
+
+write_agents_md "$openspec"
+
+if [[ "$openspec" == yes ]]; then
+  openspec init --scope project --tools claude
+fi
+
+git add .
+git status --short
+check_staged_secrets
+git commit -q -m "first commit"
+
+# The local repo is complete: from here a failed GitHub step keeps it for a manual retry.
+finished=yes
+
+if [[ "$local_only" == yes ]]; then
+  echo "Local repo ready in ./$name (no GitHub repo created, main not protected)."
+  exit 0
+fi
+
+gh repo create "$owner/$name" "--$visibility" --source=. --remote=origin --push
+actual="$(gh repo view "$owner/$name" --json visibility -q .visibility)"
+expected="$(echo "$visibility" | tr '[:lower:]' '[:upper:]')"
+[[ "$actual" == "$expected" ]] || die "visibility is $actual, expected $expected"
+
+if [[ "$visibility" == public ]]; then
+  apply_ruleset "$owner/$name"
+  echo "Ruleset protect-main applied."
+else
+  git config --local agent.protectMain true
+  echo "Local guard on (agent.protectMain=true)."
+fi
+
+echo
+echo "Done: https://github.com/$owner/$name"
+echo "Next: fill in the \`<one-line purpose>\` and Layout placeholders in AGENTS.md (on a branch,"
+echo "not on main), then: git switch -c feat/first-change"
